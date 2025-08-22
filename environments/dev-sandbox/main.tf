@@ -43,9 +43,8 @@ locals {
   public_subnet_cidrs  = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
   private_subnet_cidrs = ["10.0.11.0/24", "10.0.12.0/24", "10.0.13.0/24"]
 
-  # S3 Backend Configuration
-  state_bucket_name      = "dev-sandbox-terraform-state"
-  dynamodb_table_name    = "dev-sandbox-terraform-locks"
+  # S3 Configuration
+  s3_bucket_name = "dev-sandbox-s3-bucket"
 
   # ECR Configuration
   image_tag_mutability = "MUTABLE"
@@ -85,16 +84,14 @@ locals {
   ssl_policy       = "ELBSecurityPolicy-TLS-1-2-2017-01"
 }
 
-# S3 Backend Module
+# S3 Module
 module "s3_backend" {
   source = "../../modules/s3-backend"
 
-  name_prefix         = local.name_prefix
-  environment         = local.environment
-  bucket_name         = local.state_bucket_name
-  dynamodb_table_name = local.dynamodb_table_name
-  region              = local.region
-  force_destroy       = true
+  name_prefix   = local.name_prefix
+  environment   = local.environment
+  bucket_name   = local.s3_bucket_name
+  force_destroy = true
 }
 
 # VPC Module
