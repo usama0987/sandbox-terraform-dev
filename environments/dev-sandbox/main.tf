@@ -9,10 +9,9 @@ terraform {
   }
 
   backend "s3" {
-    # Configure these values when initializing:
-    # bucket = "your-terraform-state-bucket"
-    # key    = "dev-sandbox/terraform.tfstate"
-    # region = "us-east-1"
+    bucket = "sandbox-dev-terraform-statefiles"
+    key    = "dev-sandbox/terraform.tfstate"
+    region = "us-east-1"
   }
 }
 
