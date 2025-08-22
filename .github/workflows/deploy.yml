@@ -13,7 +13,7 @@ on:
       - main
       - develop
     paths:
-      - 'infra/**'
+      - 'sandbox-terraform-dev/**'
   workflow_dispatch:
     inputs:
       action:
