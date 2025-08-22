@@ -1,4 +1,3 @@
-
 # ECR Repository
 resource "aws_ecr_repository" "main" {
   name                 = "${var.name_prefix}-repository"
@@ -11,7 +10,7 @@ resource "aws_ecr_repository" "main" {
 
   encryption_configuration {
     encryption_type = var.encryption_type
-    kms_key        = var.kms_key
+    kms_key         = var.kms_key
   }
 
   tags = {
@@ -42,9 +41,7 @@ resource "aws_ecr_repository_policy" "main" {
       {
         Sid    = "AllowSpecificPrincipals"
         Effect = "Allow"
-        Principal = {
-          AWS = var.allowed_principals
-        }
+        Principal = var.allowed_principals != null ? { AWS = var.allowed_principals } : {}
         Action = [
           "ecr:GetAuthorizationToken",
           "ecr:BatchCheckLayerAvailability",
