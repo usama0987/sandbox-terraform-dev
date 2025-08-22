@@ -1,3 +1,4 @@
+# Security Group Module
 # Shared security group for ALB and ECS
 resource "aws_security_group" "shared" {
   name_prefix = "${var.name_prefix}-shared-"
