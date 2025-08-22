@@ -7,7 +7,7 @@ on:
       - main
       - develop
     paths:
-      - 'infra/**'
+      - 'sandbox-terraform-dev/**'
   pull_request:
     branches:
       - main
