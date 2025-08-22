@@ -1,0 +1,248 @@
+
+name: 'Terraform Deploy - Dev Sandbox'
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'infra/**'
+  pull_request:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'infra/**'
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Terraform Action'
+        required: true
+        default: 'plan'
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
+
+env:
+  TF_VERSION: '1.5.0'
+  AWS_REGION: 'us-east-1'
+  TERRAFORM_DIR: './infra/environments/dev-sandbox'
+
+jobs:
+  terraform-validate:
+    name: 'Terraform Validate'
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform Format Check
+        id: fmt
+        run: terraform fmt -check -recursive
+        working-directory: ./infra
+        continue-on-error: true
+
+      - name: Terraform Init
+        id: init
+        run: terraform init
+        working-directory: ${{ env.TERRAFORM_DIR }}
+
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate
+        working-directory: ${{ env.TERRAFORM_DIR }}
+
+      - name: Comment Format Check Results
+        if: github.event_name == 'pull_request' && steps.fmt.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '❌ **Terraform Format Check Failed**\n\nPlease run `terraform fmt -recursive` to fix formatting issues.'
+            })
+
+  terraform-plan:
+    name: 'Terraform Plan'
+    runs-on: ubuntu-latest
+    needs: terraform-validate
+    if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'plan')
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform Init
+        run: terraform init
+        working-directory: ${{ env.TERRAFORM_DIR }}
+
+      - name: Terraform Plan
+        id: plan
+        run: |
+          terraform plan -no-color -out=tfplan
+          terraform show -no-color tfplan > plan_output.txt
+        working-directory: ${{ env.TERRAFORM_DIR }}
+
+      - name: Upload Plan Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-plan
+          path: |
+            ${{ env.TERRAFORM_DIR }}/tfplan
+            ${{ env.TERRAFORM_DIR }}/plan_output.txt
+          retention-days: 5
+
+      - name: Comment Plan Results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const planOutput = fs.readFileSync('${{ env.TERRAFORM_DIR }}/plan_output.txt', 'utf8');
+            const truncatedOutput = planOutput.length > 65000 ? 
+              planOutput.substring(0, 65000) + '\n\n... (output truncated)' : 
+              planOutput;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## 📋 Terraform Plan Results
+            
+            <details>
+            <summary>Show Plan Output</summary>
+            
+            \`\`\`terraform
+            ${truncatedOutput}
+            \`\`\`
+            
+            </details>
+            
+            **Plan Status:** ${{ steps.plan.outcome == 'success' && '✅ Success' || '❌ Failed' }}
+            
+            > 💡 To apply these changes, merge this PR or run the workflow manually with 'apply' action.`
+            })
+
+  terraform-apply:
+    name: 'Terraform Apply'
+    runs-on: ubuntu-latest
+    needs: terraform-validate
+    if: |
+      ((github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') && github.event_name == 'push') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply')
+    environment: 
+      name: dev-sandbox
+      url: ${{ steps.apply.outputs.alb_dns_name }}
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform Init
+        run: terraform init
+        working-directory: ${{ env.TERRAFORM_DIR }}
+
+      - name: Terraform Plan
+        run: terraform plan -out=tfplan
+        working-directory: ${{ env.TERRAFORM_DIR }}
+
+      - name: Terraform Apply
+        id: apply
+        run: |
+          terraform apply -auto-approve tfplan
+          echo "alb_dns_name=$(terraform output -raw alb_dns_name)" >> $GITHUB_OUTPUT
+        working-directory: ${{ env.TERRAFORM_DIR }}
+
+      - name: Output Infrastructure URLs
+        run: |
+          echo "## 🚀 Infrastructure Deployed Successfully!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Access URLs:" >> $GITHUB_STEP_SUMMARY
+          echo "- **Application URL:** http://$(terraform output -raw alb_dns_name)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Direct Port Access:** http://$(terraform output -raw alb_dns_name):5000" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Infrastructure Details:" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** dev-sandbox" >> $GITHUB_STEP_SUMMARY
+          echo "- **Region:** us-east-1" >> $GITHUB_STEP_SUMMARY
+          echo "- **ECS Cluster:** $(terraform output -raw ecs_cluster_name)" >> $GITHUB_STEP_SUMMARY
+          echo "- **ECR Repository:** $(terraform output -raw ecr_repository_url)" >> $GITHUB_STEP_SUMMARY
+        working-directory: ${{ env.TERRAFORM_DIR }}
+
+  terraform-destroy:
+    name: 'Terraform Destroy'
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy'
+    environment: 
+      name: dev-sandbox-destroy
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform Init
+        run: terraform init
+        working-directory: ${{ env.TERRAFORM_DIR }}
+
+      - name: Terraform Destroy
+        run: terraform destroy -auto-approve
+        working-directory: ${{ env.TERRAFORM_DIR }}
+
+      - name: Destruction Complete
+        run: |
+          echo "## 🗑️ Infrastructure Destroyed Successfully!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "All resources in the dev-sandbox environment have been destroyed." >> $GITHUB_STEP_SUMMARY
