@@ -1,4 +1,3 @@
-
 # Data source for current AWS account ID
 data "aws_caller_identity" "current" {}
 
@@ -128,7 +127,7 @@ resource "aws_ecs_task_definition" "app" {
   cpu                      = var.task_cpu
   memory                   = var.task_memory
   execution_role_arn       = aws_iam_role.task_execution_role.arn
-  task_role_arn           = aws_iam_role.task_role.arn
+  task_role_arn            = aws_iam_role.task_role.arn
 
   container_definitions = jsonencode([
     {
