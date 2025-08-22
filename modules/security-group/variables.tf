@@ -1,3 +1,4 @@
+# Security Group Module Variables
 variable "name_prefix" {
   description = "Prefix for resource names"
   type        = string
