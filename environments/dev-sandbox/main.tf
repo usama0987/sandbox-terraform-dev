@@ -99,7 +99,6 @@ module "vpc" {
   source = "../../modules/vpc"
 
   name_prefix          = local.name_prefix
-  region               = local.region
   vpc_cidr             = local.vpc_cidr
   public_subnet_cidrs  = local.public_subnet_cidrs
   private_subnet_cidrs = local.private_subnet_cidrs
