@@ -111,10 +111,9 @@ module "alb" {
   source = "../../modules/alb"
 
   name_prefix             = local.name_prefix
-  environment             = local.environment
   vpc_id                  = module.vpc.vpc_id
   public_subnet_ids       = module.vpc.public_subnet_ids
-  security_group_id       = module.security_group.security_group_id
+  security_group_ids      = [module.security_group.security_group_id]
   health_check_path       = local.health_check_path
   ssl_policy              = local.ssl_policy
   enable_deletion_protection = false
