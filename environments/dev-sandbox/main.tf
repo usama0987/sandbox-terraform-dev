@@ -84,7 +84,7 @@ module "vpc" {
 
 # Security Group Module
 module "security_group" {
-  source = "../../modules/security-group"
+  source = "../../modules/security_groups"
 
   name_prefix = local.name_prefix
   environment = local.environment
