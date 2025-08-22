@@ -1,3 +1,4 @@
+
 # Security Group Module Variables
 variable "name_prefix" {
   description = "Prefix for resource names"
@@ -13,3 +14,4 @@ variable "vpc_id" {
   description = "ID of the VPC where the security group will be created"
   type        = string
 }
+
