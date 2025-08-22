@@ -1,0 +1,168 @@
+
+# AWS Provider Configuration
+terraform {
+  required_version = ">= 1.0"
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+
+  backend "s3" {
+    bucket         = "dev-sandbox-terraform-state"
+    key            = "dev-sandbox/terraform.tfstate"
+    region         = "us-east-1"
+    encrypt        = true
+    dynamodb_table = "dev-sandbox-terraform-locks"
+  }
+}
+
+provider "aws" {
+  region = "us-east-1"
+
+  default_tags {
+    tags = {
+      Environment   = "dev-sandbox"
+      Project       = "dev-sandbox-ecs-infrastructure"
+      ManagedBy     = "terraform"
+      Owner         = "dev-team"
+      CostCenter    = "development"
+    }
+  }
+}
+
+# Local values for environment-specific configurations
+locals {
+  name_prefix = "dev-sandbox"
+  environment = "dev-sandbox"
+  region      = "us-east-1"
+
+  # VPC Configuration
+  vpc_cidr             = "10.0.0.0/16"
+  public_subnet_cidrs  = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
+  private_subnet_cidrs = ["10.0.11.0/24", "10.0.12.0/24", "10.0.13.0/24"]
+
+  # S3 Backend Configuration
+  state_bucket_name      = "dev-sandbox-terraform-state"
+  dynamodb_table_name    = "dev-sandbox-terraform-locks"
+
+  # ECR Configuration
+  image_tag_mutability = "MUTABLE"
+  scan_on_push        = true
+  max_image_count     = 10
+  untagged_image_days = 7
+
+  # ECS Configuration
+  task_cpu           = "512"
+  task_memory        = "1024"
+  desired_count      = 2
+  min_capacity       = 1
+  max_capacity       = 6
+  cpu_target_value   = 70
+  memory_target_value = 80
+  log_retention_days = 7
+
+  # Application Configuration
+  container_image = "${module.ecr.repository_url}:latest"
+  environment_variables = [
+    {
+      name  = "ENVIRONMENT"
+      value = "dev-sandbox"
+    },
+    {
+      name  = "LOG_LEVEL"
+      value = "DEBUG"
+    },
+    {
+      name  = "PORT"
+      value = "5000"
+    }
+  ]
+
+  # ALB Configuration
+  health_check_path = "/health"
+  ssl_policy       = "ELBSecurityPolicy-TLS-1-2-2017-01"
+}
+
+# S3 Backend Module
+module "s3_backend" {
+  source = "../../modules/s3-backend"
+
+  name_prefix         = local.name_prefix
+  environment         = local.environment
+  bucket_name         = local.state_bucket_name
+  dynamodb_table_name = local.dynamodb_table_name
+  region              = local.region
+  force_destroy       = true
+}
+
+# VPC Module
+module "vpc" {
+  source = "../../modules/vpc"
+
+  name_prefix          = local.name_prefix
+  region               = local.region
+  vpc_cidr             = local.vpc_cidr
+  public_subnet_cidrs  = local.public_subnet_cidrs
+  private_subnet_cidrs = local.private_subnet_cidrs
+}
+
+# Security Group Module
+module "security_group" {
+  source = "../../modules/security-group"
+
+  name_prefix = local.name_prefix
+  environment = local.environment
+  vpc_id      = module.vpc.vpc_id
+}
+
+# ECR Module
+module "ecr" {
+  source = "../../modules/ecr"
+
+  name_prefix          = local.name_prefix
+  environment          = local.environment
+  image_tag_mutability = local.image_tag_mutability
+  scan_on_push         = local.scan_on_push
+  encryption_type      = "AES256"
+  force_delete         = true
+  max_image_count      = local.max_image_count
+  untagged_image_days  = local.untagged_image_days
+}
+
+# Application Load Balancer Module
+module "alb" {
+  source = "../../modules/alb"
+
+  name_prefix             = local.name_prefix
+  environment             = local.environment
+  vpc_id                  = module.vpc.vpc_id
+  public_subnet_ids       = module.vpc.public_subnet_ids
+  security_group_id       = module.security_group.security_group_id
+  health_check_path       = local.health_check_path
+  ssl_policy              = local.ssl_policy
+  enable_deletion_protection = false
+}
+
+# ECS Module
+module "ecs" {
+  source = "../../modules/ecs"
+
+  name_prefix           = local.name_prefix
+  environment           = local.environment
+  vpc_id                = module.vpc.vpc_id
+  private_subnet_ids    = module.vpc.private_subnet_ids
+  security_group_id     = module.security_group.security_group_id
+  target_group_arn      = module.alb.target_group_arn
+  container_image       = local.container_image
+  task_cpu              = local.task_cpu
+  task_memory           = local.task_memory
+  desired_count         = local.desired_count
+  min_capacity          = local.min_capacity
+  max_capacity          = local.max_capacity
+  cpu_target_value      = local.cpu_target_value
+  memory_target_value   = local.memory_target_value
+  log_retention_days    = local.log_retention_days
+  environment_variables = local.environment_variables
+}
