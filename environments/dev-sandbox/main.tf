@@ -9,13 +9,7 @@ terraform {
     }
   }
 
-  backend "s3" {
-    bucket         = "dev-sandbox-terraform-state"
-    key            = "dev-sandbox/terraform.tfstate"
-    region         = "us-east-1"
-    encrypt        = true
-    dynamodb_table = "dev-sandbox-terraform-locks"
-  }
+
 }
 
 provider "aws" {
@@ -42,9 +36,6 @@ locals {
   vpc_cidr             = "10.0.0.0/16"
   public_subnet_cidrs  = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
   private_subnet_cidrs = ["10.0.11.0/24", "10.0.12.0/24", "10.0.13.0/24"]
-
-  # S3 Configuration
-  s3_bucket_name = "dev-sandbox-s3-bucket"
 
   # ECR Configuration
   image_tag_mutability = "MUTABLE"
@@ -82,16 +73,6 @@ locals {
   # ALB Configuration
   health_check_path = "/health"
   ssl_policy       = "ELBSecurityPolicy-TLS-1-2-2017-01"
-}
-
-# S3 Module
-module "s3_backend" {
-  source = "../../modules/s3-backend"
-
-  name_prefix   = local.name_prefix
-  environment   = local.environment
-  bucket_name   = local.s3_bucket_name
-  force_destroy = true
 }
 
 # VPC Module
