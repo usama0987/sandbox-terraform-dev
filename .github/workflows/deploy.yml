@@ -1,0 +1,205 @@
+# .github/workflows/deploy.yml - Updated for manual S3 backend
+name: 'Terraform Infrastructure Deployment'
+
+on:
+  push:
+    branches: 
+      - main
+      - develop
+    paths: 
+      - 'environments/**'
+      - 'modules/**'
+      - '.github/workflows/**'
+  pull_request:
+    branches: 
+      - main
+    paths:
+      - 'environments/**'
+      - 'modules/**'
+  workflow_dispatch:
+
+env:
+  TF_VERSION: '1.5.7'
+  AWS_REGION: 'us-east-1'
+  TF_WORKING_DIR: 'environments/dev-sandbox'
+  S3_BACKEND_BUCKET: 'sandbox-dev-terraform-statefiles'
+
+jobs:
+  # Pre-check job to verify S3 bucket exists
+  pre-check:
+    name: 'Pre-deployment Checks'
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 'Configure AWS Credentials'
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: 'Verify S3 Backend Bucket Exists'
+      run: |
+        echo "🔍 Checking if S3 backend bucket exists..."
+        if aws s3api head-bucket --bucket ${{ env.S3_BACKEND_BUCKET }} 2>/dev/null; then
+          echo "✅ S3 bucket ${{ env.S3_BACKEND_BUCKET }} exists and is accessible"
+          
+          # Check if versioning is enabled
+          VERSIONING=$(aws s3api get-bucket-versioning --bucket ${{ env.S3_BACKEND_BUCKET }} --query 'Status' --output text)
+          if [ "$VERSIONING" = "Enabled" ]; then
+            echo "✅ Bucket versioning is enabled"
+          else
+            echo "⚠️ WARNING: Bucket versioning is not enabled. This is recommended for state files."
+          fi
+          
+          # Check encryption
+          if aws s3api get-bucket-encryption --bucket ${{ env.S3_BACKEND_BUCKET }} >/dev/null 2>&1; then
+            echo "✅ Bucket encryption is enabled"
+          else
+            echo "⚠️ WARNING: Bucket encryption is not enabled. This is recommended for state files."
+          fi
+        else
+          echo "❌ S3 bucket ${{ env.S3_BACKEND_BUCKET }} does not exist or is not accessible"
+          echo "Please create the bucket manually in the AWS Console with the following settings:"
+          echo "- Bucket name: ${{ env.S3_BACKEND_BUCKET }}"
+          echo "- Region: ${{ env.AWS_REGION }}"
+          echo "- Versioning: Enabled"
+          echo "- Encryption: Enabled"
+          echo "- Public access: Blocked"
+          exit 1
+        fi
+
+    outputs:
+      bucket_exists: ${{ steps.check.conclusion == 'success' }}
+
+  validate:
+    name: 'Validate Terraform Configuration'
+    runs-on: ubuntu-latest
+    needs: pre-check
+    
+    steps:
+    - name: 'Checkout Repository'
+      uses: actions/checkout@v4
+
+    - name: 'Setup Terraform'
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ env.TF_VERSION }}
+        terraform_wrapper: false
+
+    - name: 'Terraform Format Check'
+      run: |
+        echo "🔍 Checking Terraform formatting..."
+        terraform fmt -check -recursive
+
+    - name: 'Terraform Init (Backend=false for validation)'
+      working-directory: ${{ env.TF_WORKING_DIR }}
+      run: terraform init -backend=false
+
+    - name: 'Terraform Validate'
+      working-directory: ${{ env.TF_WORKING_DIR }}
+      run: terraform validate
+
+  plan:
+    name: 'Terraform Plan'
+    runs-on: ubuntu-latest
+    needs: [pre-check, validate]
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    
+    steps:
+    - name: 'Checkout Repository'
+      uses: actions/checkout@v4
+
+    - name: 'Setup Terraform'
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ env.TF_VERSION }}
+        terraform_wrapper: false
+
+    - name: 'Configure AWS Credentials'
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: 'Terraform Init'
+      working-directory: ${{ env.TF_WORKING_DIR }}
+      run: terraform init
+
+    - name: 'Terraform Plan'
+      working-directory: ${{ env.TF_WORKING_DIR }}
+      run: |
+        terraform plan -detailed-exitcode -out=tfplan 2>&1 | tee plan.log
+
+    - name: 'Upload Plan Artifact'
+      uses: actions/upload-artifact@v3
+      with:
+        name: terraform-plan
+        path: |
+          ${{ env.TF_WORKING_DIR }}/tfplan
+          ${{ env.TF_WORKING_DIR }}/plan.log
+
+  apply:
+    name: 'Terraform Apply'
+    runs-on: ubuntu-latest
+    needs: [pre-check, validate]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: 
+      name: dev-sandbox
+    
+    steps:
+    - name: 'Checkout Repository'
+      uses: actions/checkout@v4
+
+    - name: 'Setup Terraform'
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ env.TF_VERSION }}
+        terraform_wrapper: false
+
+    - name: 'Configure AWS Credentials'
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: 'Terraform Init'
+      working-directory: ${{ env.TF_WORKING_DIR }}
+      run: terraform init
+
+    - name: 'Terraform Apply'
+      id: deploy
+      working-directory: ${{ env.TF_WORKING_DIR }}
+      run: |
+        echo "🚀 Deploying infrastructure..."
+        terraform apply -auto-approve 2>&1 | tee apply.log
+        
+        # Extract outputs
+        ALB_DNS=$(terraform output -raw alb_dns_name 2>/dev/null || echo "Not available")
+        ECR_URL=$(terraform output -raw ecr_repository_url 2>/dev/null || echo "Not available")
+        CLUSTER_NAME=$(terraform output -raw ecs_cluster_name 2>/dev/null || echo "Not available")
+        
+        echo "application_url=http://$ALB_DNS" >> $GITHUB_OUTPUT
+        echo "ecr_repository_url=$ECR_URL" >> $GITHUB_OUTPUT
+        echo "ecs_cluster_name=$CLUSTER_NAME" >> $GITHUB_OUTPUT
+
+    - name: 'Deployment Summary'
+      run: |
+        cat << EOF >> $GITHUB_STEP_SUMMARY
+        ## 🎉 Deployment Successful!
+        
+        ### 🌐 Application Access
+        - **Application URL**: ${{ steps.deploy.outputs.application_url }}
+        - **Health Check**: ${{ steps.deploy.outputs.application_url }}/health
+        
+        ### 📦 Container Registry
+        - **ECR Repository**: ${{ steps.deploy.outputs.ecr_repository_url }}
+        
+        ### 🏗️ Infrastructure Details
+        - **ECS Cluster**: ${{ steps.deploy.outputs.ecs_cluster_name }}
+        - **Region**: ${{ env.AWS_REGION }}
+        - **Environment**: dev-sandbox
+        - **State Backend**: s3://${{ env.S3_BACKEND_BUCKET }}/dev-sandbox/terraform.tfstate
+        EOF
