@@ -7,13 +7,14 @@ on:
       - main
       - develop
     paths:
-      - 'sandbox-terraform-dev/**'
+      - 'infra/**'
+      - '.github/workflows/**'
   pull_request:
     branches:
       - main
       - develop
     paths:
-      - 'sandbox-terraform-dev/**'
+      - 'infra/**'
   workflow_dispatch:
     inputs:
       action:
