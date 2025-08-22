@@ -96,7 +96,6 @@ module "ecr" {
   source = "../../modules/ecr"
 
   name_prefix          = local.name_prefix
-  environment          = local.environment
   image_tag_mutability = local.image_tag_mutability
   scan_on_push         = local.scan_on_push
   encryption_type      = "AES256"
