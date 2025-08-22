@@ -20,12 +20,6 @@ output "private_subnet_ids" {
   value       = module.vpc.private_subnet_ids
 }
 
-# S3 Outputs
-output "s3_bucket_name" {
-  description = "Name of the S3 bucket"
-  value       = module.s3_backend.s3_bucket_id
-}
-
 # Security Group Outputs
 output "security_group_id" {
   description = "ID of the shared security group"
