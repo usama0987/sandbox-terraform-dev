@@ -1,19 +1,3 @@
-variable "name_prefix" {
-  description = "Prefix for resource names"
-  type        = string
-}
-
-variable "vpc_id" {
-  description = "VPC ID for the security group"
-  type        = string
-}
-
-variable "environment" {
-  description = "Environment name (e.g., dev-sandbox)"
-  type        = string
-  default     = "dev-sandbox"
-}
-
 resource "aws_security_group" "main" {
   name        = "${var.name_prefix}-alb-ecs-sg"
   description = "Security group for ECS and ALB in ${coalesce(var.environment, "dev-sandbox")}"
