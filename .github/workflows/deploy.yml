@@ -259,3 +259,4 @@ jobs:
           echo "### Current State:" >> $GITHUB_STEP_SUMMARY
           terraform state list >> $GITHUB_STEP_SUMMARY || echo "No resources in state" >> $GITHUB_STEP_SUMMARY
         working-directory: ${{ env.TERRAFORM_DIR }}
+
