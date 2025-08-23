@@ -7,16 +7,12 @@ on:
       - 'environments/**'
       - 'modules/**'
       - '.github/workflows/deploy.yml'      # only this workflow file
-    paths-ignore:
-      - '.github/workflows/destroy.yml'     # never trigger on destroy workflow changes
   pull_request:
     branches: [ main, develop ]
     paths:
       - 'environments/**'
       - 'modules/**'
       - '.github/workflows/deploy.yml'
-    paths-ignore:
-      - '.github/workflows/destroy.yml'
   workflow_dispatch:
     inputs:
       action:
