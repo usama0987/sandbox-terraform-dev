@@ -43,12 +43,10 @@ locals {
   # ECS Configuration
   task_cpu           = "512"
   task_memory        = "1024"
-  desired_count      = 2
-  min_capacity       = 1
-  max_capacity       = 2
-  cpu_target_value   = 70
-  memory_target_value = 80
+  desired_count      = 1  # Set to 1 for minimum and maximum 1 container
   log_retention_days = 7
+  container_name     = "app"
+  container_port     = 5000
 
   # Application Configuration
   container_image = "${module.ecr.repository_url}:latest"
@@ -132,21 +130,19 @@ module "ecs" {
   desired_count         = local.desired_count
   log_retention_days    = local.log_retention_days
   environment_variables = local.environment_variables
-  max_capacity          = local.max_capacity
-  min_capacity          = local.min_capacity
-  cpu_target_value      = local.cpu_target_value
-  memory_target_value   = local.memory_target_value
-  enable_container_insights = true # Example value, adjust as needed
-  enable_health_check   = true    # Example value, adjust as needed
-  health_check_command  = ["CMD-SHELL", "curl -f http://localhost:5000/health || exit 1"]
+  enable_container_insights = true
+  enable_health_check   = true
+  health_check_command  = ["CMD-SHELL", "curl -f http://localhost:${local.container_port}/health || exit 1"]
   health_check_interval = 30
   health_check_timeout  = 5
   health_check_retries  = 3
   health_check_start_period = 60
-  platform_version      = "1.4.0"  # Example value, adjust as needed
+  container_name        = local.container_name
+  container_port        = local.container_port
+  platform_version      = "1.4.0"
   deployment_maximum_percent = 200
   deployment_minimum_healthy_percent = 100
   enable_deployment_circuit_breaker = true
   enable_deployment_rollback = true
-  enable_execute_command = false   # Example value, adjust as needed
+  enable_execute_command = false
 }
