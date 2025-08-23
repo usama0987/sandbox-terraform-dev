@@ -1,13 +1,8 @@
+# Data source for current AWS account ID
+data "aws_caller_identity" "current" {}
 
-# CloudWatch Log Group for ECS tasks
-resource "aws_cloudwatch_log_group" "ecs_logs" {
-  name              = "/ecs/${var.name_prefix}"
-  retention_in_days = var.log_retention_days
-
-  tags = {
-    Name = "${var.name_prefix}-ecs-logs"
-  }
-}
+# Data source for current AWS region
+data "aws_region" "current" {}
 
 # ECS Cluster
 resource "aws_ecs_cluster" "main" {
@@ -20,6 +15,72 @@ resource "aws_ecs_cluster" "main" {
 
   tags = {
     Name = "${var.name_prefix}-cluster"
+  }
+}
+
+# Task Execution Role (created if not provided)
+resource "aws_iam_role" "task_execution_role" {
+  count = var.task_execution_role_arn == null ? 1 : 0
+
+  name = "${var.name_prefix}-task-execution-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "ecs-tasks.amazonaws.com"
+        }
+      }
+    ]
+  })
+
+  tags = {
+    Name        = "${var.name_prefix}-task-execution-role"
+  }
+}
+
+# Attach AWS managed policy for task execution
+resource "aws_iam_role_policy_attachment" "task_execution_role_policy" {
+  count = var.task_execution_role_arn == null ? 1 : 0
+
+  role       = aws_iam_role.task_execution_role[0].name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+}
+
+# Task Role (created if not provided)
+resource "aws_iam_role" "task_role" {
+  count = var.task_role_arn == null ? 1 : 0
+
+  name = "${var.name_prefix}-task-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "ecs-tasks.amazonaws.com"
+        }
+      }
+    ]
+  })
+
+  tags = {
+    Name        = "${var.name_prefix}-task-role"
+  }
+}
+
+# CloudWatch Logs Group
+resource "aws_cloudwatch_log_group" "ecs_logs" {
+  name              = "/ecs/${var.name_prefix}"
+  retention_in_days = var.log_retention_days
+
+  tags = {
+    Name        = "${var.name_prefix}-ecs-logs"
   }
 }
 
@@ -65,8 +126,8 @@ resource "aws_ecs_task_definition" "app" {
   requires_compatibilities = ["FARGATE"]
   cpu                      = var.task_cpu
   memory                   = var.task_memory
-  execution_role_arn       = var.task_execution_role_arn
-  task_role_arn           = var.task_role_arn
+  execution_role_arn       = var.task_execution_role_arn != null ? var.task_execution_role_arn : aws_iam_role.task_execution_role[0].arn
+  task_role_arn            = var.task_role_arn != null ? var.task_role_arn : aws_iam_role.task_role[0].arn
 
   container_definitions = jsonencode([
     {
@@ -154,5 +215,47 @@ resource "aws_ecs_service" "app" {
   }
 }
 
-# Data source for current AWS region
-data "aws_region" "current" {}
+# Auto Scaling Target
+resource "aws_appautoscaling_target" "ecs_target" {
+  max_capacity       = var.max_capacity
+  min_capacity       = var.min_capacity
+  resource_id        = "service/${aws_ecs_cluster.main.name}/${aws_ecs_service.app.name}"
+  scalable_dimension = "ecs:service:DesiredCount"
+  service_namespace  = "ecs"
+}
+
+# Auto Scaling Policy - CPU
+resource "aws_appautoscaling_policy" "ecs_policy_cpu" {
+  name               = "${var.name_prefix}-cpu-scaling"
+  policy_type        = "TargetTrackingScaling"
+  resource_id        = aws_appautoscaling_target.ecs_target.resource_id
+  scalable_dimension = aws_appautoscaling_target.ecs_target.scalable_dimension
+  service_namespace  = aws_appautoscaling_target.ecs_target.service_namespace
+
+  target_tracking_scaling_policy_configuration {
+    predefined_metric_specification {
+      predefined_metric_type = "ECSServiceAverageCPUUtilization"
+    }
+    target_value       = var.cpu_target_value
+    scale_in_cooldown  = 300
+    scale_out_cooldown = 300
+  }
+}
+
+# Auto Scaling Policy - Memory
+resource "aws_appautoscaling_policy" "ecs_policy_memory" {
+  name               = "${var.name_prefix}-memory-scaling"
+  policy_type        = "TargetTrackingScaling"
+  resource_id        = aws_appautoscaling_target.ecs_target.resource_id
+  scalable_dimension = aws_appautoscaling_target.ecs_target.scalable_dimension
+  service_namespace  = aws_appautoscaling_target.ecs_target.service_namespace
+
+  target_tracking_scaling_policy_configuration {
+    predefined_metric_specification {
+      predefined_metric_type = "ECSServiceAverageMemoryUtilization"
+    }
+    target_value       = var.memory_target_value
+    scale_in_cooldown  = 300
+    scale_out_cooldown = 300
+  }
+}
