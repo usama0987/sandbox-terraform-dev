@@ -14,11 +14,11 @@ provider "aws" {
 
   default_tags {
     tags = {
-      Environment   = "dev-sandbox"
-      Project       = "dev-sandbox-ecs-infrastructure"
-      ManagedBy     = "terraform"
-      Owner         = "dev-team"
-      CostCenter    = "development"
+      Environment = "dev-sandbox"
+      Project     = "dev-sandbox-ecs-infrastructure"
+      ManagedBy   = "terraform"
+      Owner       = "dev-team"
+      CostCenter  = "development"
     }
   }
 }
@@ -36,14 +36,14 @@ locals {
 
   # ECR Configuration
   image_tag_mutability = "MUTABLE"
-  scan_on_push        = true
-  max_image_count     = 10
-  untagged_image_days = 7
+  scan_on_push         = true
+  max_image_count      = 10
+  untagged_image_days  = 7
 
   # ECS Configuration
   task_cpu           = "512"
   task_memory        = "1024"
-  desired_count      = 1  # Set to 1 for minimum and maximum 1 container
+  desired_count      = 1 # Set to 1 for minimum and maximum 1 container
   log_retention_days = 7
   container_name     = "app"
   container_port     = 5000
@@ -67,7 +67,7 @@ locals {
 
   # ALB Configuration
   health_check_path = "/health"
-  ssl_policy       = "ELBSecurityPolicy-TLS-1-2-2017-01"
+  ssl_policy        = "ELBSecurityPolicy-TLS-1-2-2017-01"
 }
 
 # VPC Module
@@ -106,12 +106,12 @@ module "ecr" {
 module "alb" {
   source = "../../modules/alb"
 
-  name_prefix             = local.name_prefix
-  vpc_id                  = module.vpc.vpc_id
-  public_subnet_ids       = module.vpc.public_subnet_ids
-  security_group_ids      = [module.security_group.security_group_id]
-  health_check_path       = local.health_check_path
-  ssl_policy              = local.ssl_policy
+  name_prefix                = local.name_prefix
+  vpc_id                     = module.vpc.vpc_id
+  public_subnet_ids          = module.vpc.public_subnet_ids
+  security_group_ids         = [module.security_group.security_group_id]
+  health_check_path          = local.health_check_path
+  ssl_policy                 = local.ssl_policy
   enable_deletion_protection = false
 }
 
@@ -119,30 +119,30 @@ module "alb" {
 module "ecs" {
   source = "../../modules/ecs"
 
-  name_prefix           = local.name_prefix
-  vpc_id                = module.vpc.vpc_id
-  private_subnet_ids    = module.vpc.private_subnet_ids
-  security_group_ids    = [module.security_group.security_group_id]
-  target_group_arn      = module.alb.target_group_arn
-  container_image       = local.container_image
-  task_cpu              = local.task_cpu
-  task_memory           = local.task_memory
-  desired_count         = local.desired_count
-  log_retention_days    = local.log_retention_days
-  environment_variables = local.environment_variables
-  enable_container_insights = true
-  enable_health_check   = true
-  health_check_command  = ["CMD-SHELL", "curl -f http://localhost:${local.container_port}/health || exit 1"]
-  health_check_interval = 30
-  health_check_timeout  = 5
-  health_check_retries  = 3
-  health_check_start_period = 60
-  container_name        = local.container_name
-  container_port        = local.container_port
-  platform_version      = "1.4.0"
-  deployment_maximum_percent = 200
-  deployment_minimum_healthy_percent = 100
-  enable_deployment_circuit_breaker = true
-  enable_deployment_rollback = true
-  enable_execute_command = false
+  name_prefix                            = local.name_prefix
+  vpc_id                                 = module.vpc.vpc_id
+  private_subnet_ids                     = module.vpc.private_subnet_ids
+  security_group_ids                     = [module.security_group.security_group_id]
+  target_group_arn                       = module.alb.target_group_arn
+  container_image                        = local.container_image
+  task_cpu                               = local.task_cpu
+  task_memory                            = local.task_memory
+  desired_count                          = local.desired_count
+  log_retention_days                     = local.log_retention_days
+  environment_variables                  = local.environment_variables
+  enable_container_insights              = true
+  enable_health_check                    = true
+  health_check_command                   = ["CMD-SHELL", "curl -f http://localhost:${local.container_port}/health || exit 1"]
+  health_check_interval                  = 30
+  health_check_timeout                   = 5
+  health_check_retries                   = 3
+  health_check_start_period              = 60
+  container_name                         = local.container_name
+  container_port                         = local.container_port
+  platform_version                       = "1.4.0"
+  deployment_maximum_percent             = 200
+  deployment_minimum_healthy_percent     = 100
+  enable_deployment_circuit_breaker      = true
+  enable_deployment_rollback             = true
+  enable_execute_command                 = false
 }
