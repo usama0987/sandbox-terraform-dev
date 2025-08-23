@@ -8,6 +8,7 @@ on:
     paths:
       - 'environments/**'
       - 'modules/**'
+      - '.github/workflows/**'  # Added to trigger on workflow changes
   pull_request:
     branches:
       - main
@@ -15,6 +16,7 @@ on:
     paths:
       - 'environments/**'
       - 'modules/**'
+      - '.github/workflows/**'  # Added to trigger on workflow changes
   workflow_dispatch:
     inputs:
       action:
@@ -67,10 +69,10 @@ jobs:
           # Check if state has resources
           if terraform state list > /dev/null 2>&1; then
             echo "state_exists=true" >> $GITHUB_OUTPUT
-            echo "✅ State file has resources"
+            echo "State file has resources"
           else
             echo "state_exists=false" >> $GITHUB_OUTPUT
-            echo "ℹ️ State file is empty or doesn't exist"
+            echo "State file is empty or doesn't exist"
           fi
           
           # Import existing AWS resources that aren't in state
@@ -120,7 +122,7 @@ jobs:
           fi
           
           set -e
-          echo "✅ Import check completed"
+          echo "Import check completed"
         working-directory: ${{ env.TERRAFORM_DIR }}
 
       - name: Terraform Refresh
@@ -178,9 +180,9 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           
           if [[ "${{ github.event.inputs.action }}" == "destroy" ]]; then
-            echo "✅ Resources destroyed successfully" >> $GITHUB_STEP_SUMMARY
+            echo "Resources destroyed successfully" >> $GITHUB_STEP_SUMMARY
           else
-            echo "✅ Resources deployed successfully" >> $GITHUB_STEP_SUMMARY
+            echo "Resources deployed successfully" >> $GITHUB_STEP_SUMMARY
             
             # Show outputs if they exist
             if terraform output >/dev/null 2>&1; then
