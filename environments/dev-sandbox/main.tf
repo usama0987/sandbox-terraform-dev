@@ -122,19 +122,16 @@ module "ecs" {
   source = "../../modules/ecs"
 
   name_prefix           = local.name_prefix
-  environment           = local.environment
   vpc_id                = module.vpc.vpc_id
   private_subnet_ids    = module.vpc.private_subnet_ids
-  security_group_id     = module.security_group.security_group_id
+  security_group_ids    = [module.security_group.security_group_id]
   target_group_arn      = module.alb.target_group_arn
   container_image       = local.container_image
   task_cpu              = local.task_cpu
   task_memory           = local.task_memory
   desired_count         = local.desired_count
-  min_capacity          = local.min_capacity
-  max_capacity          = local.max_capacity
-  cpu_target_value      = local.cpu_target_value
-  memory_target_value   = local.memory_target_value
   log_retention_days    = local.log_retention_days
   environment_variables = local.environment_variables
+  task_execution_role_arn = module.ecs.aws_iam_role.task_execution_role.arn # Reference internal role
+  task_role_arn         = module.ecs.aws_iam_role.task_role.arn            # Reference internal role
 }
