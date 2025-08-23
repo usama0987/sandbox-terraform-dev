@@ -1,41 +1,24 @@
-name: 'Terraform Deploy - Dev Sandbox'
+name: 'Terraform Destroy - Dev Sandbox'
 
 on:
-  push:
-    branches: [ main, develop ]
-    paths:
-      - 'environments/**'
-      - 'modules/**'
-      - '.github/workflows/deploy.yml'
-  pull_request:
-    branches: [ main, develop ]
-    paths:
-      - 'environments/**'
-      - 'modules/**'
-      - '.github/workflows/deploy.yml'
   workflow_dispatch:
     inputs:
       action:
         description: 'Terraform Action'
         required: true
-        default: 'plan'
+        default: 'destroy'
         type: choice
-        options: [ plan, apply, destroy ]
+        options:
+          - destroy
 
 env:
   TF_VERSION: '1.5.0'
   AWS_REGION: 'us-east-1'
   TERRAFORM_DIR: 'environments/dev-sandbox'
-  TF_VAR_force_destroy: 'true'
-  # ---- Remote state backend config ----
-  TF_STATE_BUCKET: 'tesing-terraform-tf-statefiles'
-  TF_STATE_KEY: 'dev-sandbox/terraform.tfstate'
-  # Optional lock table (leave empty if you don't use DynamoDB locking)
-  TF_LOCK_TABLE: ''
 
 jobs:
   terraform:
-    name: 'Terraform Action'
+    name: 'Terraform Destroy'
     runs-on: ubuntu-latest
     environment: dev-sandbox
 
@@ -55,205 +38,16 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Terraform Init (S3 backend)
+      - name: Terraform Init
+        run: terraform init -reconfigure
         working-directory: ${{ env.TERRAFORM_DIR }}
-        run: |
-          set -e
-          ARGS=(-reconfigure \
-            -backend-config="bucket=${{ env.TF_STATE_BUCKET }}" \
-            -backend-config="key=${{ env.TF_STATE_KEY }}" \
-            -backend-config="region=${{ env.AWS_REGION }}")
-          if [ -n "${{ env.TF_LOCK_TABLE }}" ]; then
-            ARGS+=(-backend-config="dynamodb_table=${{ env.TF_LOCK_TABLE }}")
-          fi
-          terraform init "${ARGS[@]}"
-
-      - name: Check State and Import Missing Resources
-        id: state_check
-        working-directory: ${{ env.TERRAFORM_DIR }}
-        run: |
-          echo "Checking Terraform state vs AWS resources..."
-
-          # Check if state has resources
-          if terraform state list > /dev/null 2>&1; then
-            echo "state_exists=true" >> $GITHUB_OUTPUT
-            echo "State file has resources"
-          else
-            echo "state_exists=false" >> $GITHUB_OUTPUT
-            echo "State file is empty or doesn't exist"
-          fi
-
-          # Import existing AWS resources that aren't in state
-          set +e
-
-          # ECR Repository
-          if aws ecr describe-repositories --repository-names dev-sandbox-repository --region ${{ env.AWS_REGION }} >/dev/null 2>&1; then
-            if ! terraform state show module.ecr.aws_ecr_repository.main >/dev/null 2>&1; then
-              echo "Importing ECR repository..."
-              terraform import module.ecr.aws_ecr_repository.main dev-sandbox-repository
-            fi
-          fi
-
-          # IAM Roles
-          roles=(
-            "dev-sandbox-ecs-task-execution-role:module.ecr.aws_iam_role.ecs_task_execution_role"
-            "dev-sandbox-ecs-task-role:module.ecr.aws_iam_role.ecs_task_role"
-            "dev-sandbox-task-execution-role:module.ecs.aws_iam_role.task_execution_role[0]"
-            "dev-sandbox-task-role:module.ecs.aws_iam_role.task_role[0]"
-          )
-          for role in "${roles[@]}"; do
-            IFS=':' read -r role_name tf_address <<< "$role"
-            if aws iam get-role --role-name "$role_name" >/dev/null 2>&1; then
-              if ! terraform state show "$tf_address" >/dev/null 2>&1; then
-                echo "Importing $role_name..."
-                terraform import "$tf_address" "$role_name"
-              fi
-            fi
-          done
-
-          # CloudWatch Log Group
-          if aws logs describe-log-groups --log-group-name-prefix '/aws/ecs/dev-sandbox' --region ${{ env.AWS_REGION }} | grep -q '/aws/ecs/dev-sandbox'; then
-            if ! terraform state show module.ecs.aws_cloudwatch_log_group.ecs_logs >/dev/null 2>&1; then
-              echo "Importing CloudWatch log group..."
-              terraform import module.ecs.aws_cloudwatch_log_group.ecs_logs '/aws/ecs/dev-sandbox'
-            fi
-          fi
-
-          # VPC and VPC Resources
-          vpc_id=$(aws ec2 describe-vpcs --filters "Name=tag:Name,Values=dev-sandbox-vpc" --query 'Vpcs[0].VpcId' --output text 2>/dev/null)
-          if [[ "$vpc_id" != "None" && "$vpc_id" != "" ]]; then
-            if ! terraform state show module.vpc.aws_vpc.main >/dev/null 2>&1; then
-              echo "Importing VPC: $vpc_id"
-              terraform import module.vpc.aws_vpc.main "$vpc_id"
-            fi
-
-            # Import Internet Gateway
-            igw_id=$(aws ec2 describe-internet-gateways --filters "Name=attachment.vpc-id,Values=$vpc_id" --query 'InternetGateways[0].InternetGatewayId' --output text 2>/dev/null)
-            if [[ "$igw_id" != "None" && "$igw_id" != "" ]]; then
-              if ! terraform state show module.vpc.aws_internet_gateway.main >/dev/null 2>&1; then
-                echo "Importing Internet Gateway: $igw_id"
-                terraform import module.vpc.aws_internet_gateway.main "$igw_id"
-              fi
-            fi
-
-            # Import Subnets
-            subnets=$(aws ec2 describe-subnets --filters "Name=vpc-id,Values=$vpc_id" --query 'Subnets[].{Id:SubnetId,Cidr:CidrBlock,Name:Tags[?Key==`Name`].Value|[0]}' --output json)
-
-            # Public subnets (10.0.1.0/24, 10.0.2.0/24, 10.0.3.0/24)
-            public_cidrs=("10.0.1.0/24" "10.0.2.0/24" "10.0.3.0/24")
-            for i in "${!public_cidrs[@]}"; do
-              subnet_id=$(echo "$subnets" | jq -r ".[] | select(.Cidr == \"${public_cidrs[$i]}\") | .Id")
-              if [[ "$subnet_id" != "null" && "$subnet_id" != "" ]]; then
-                if ! terraform state show "module.vpc.aws_subnet.public[$i]" >/dev/null 2>&1; then
-                  echo "Importing public subnet $i: $subnet_id"
-                  terraform import "module.vpc.aws_subnet.public[$i]" "$subnet_id"
-                fi
-              fi
-            done
-
-            # Private subnets (10.0.4.0/24, 10.0.5.0/24, 10.0.6.0/24)
-            private_cidrs=("10.0.4.0/24" "10.0.5.0/24" "10.0.6.0/24")
-            for i in "${!private_cidrs[@]}"; do
-              subnet_id=$(echo "$subnets" | jq -r ".[] | select(.Cidr == \"${private_cidrs[$i]}\") | .Id")
-              if [[ "$subnet_id" != "null" && "$subnet_id" != "" ]]; then
-                if ! terraform state show "module.vpc.aws_subnet.private[$i]" >/dev/null 2>&1; then
-                  echo "Importing private subnet $i: $subnet_id"
-                  terraform import "module.vpc.aws_subnet.private[$i]" "$subnet_id"
-                fi
-              fi
-            done
-          fi
-
-          # Import Target Group
-          tg_arn=$(aws elbv2 describe-target-groups --names "dev-sandbox-app-tg" --query 'TargetGroups[0].TargetGroupArn' --output text 2>/dev/null)
-          if [[ "$tg_arn" != "None" && "$tg_arn" != "" ]]; then
-            if ! terraform state show module.alb.aws_lb_target_group.app >/dev/null 2>&1; then
-              echo "Importing Target Group: $tg_arn"
-              terraform import module.alb.aws_lb_target_group.app "$tg_arn"
-            fi
-          fi
-
-          # Import ECS Cluster
-          cluster_arn=$(aws ecs describe-clusters --clusters "dev-sandbox-cluster" --query 'clusters[0].clusterArn' --output text 2>/dev/null)
-          if [[ "$cluster_arn" != "None" && "$cluster_arn" != "" ]]; then
-            if ! terraform state show module.ecs.aws_ecs_cluster.main >/dev/null 2>&1; then
-              echo "Importing ECS Cluster: $cluster_arn"
-              terraform import module.ecs.aws_ecs_cluster.main "dev-sandbox-cluster"
-            fi
-          fi
-
-          # (Optional) Service Discovery: if you need to import Cloud Map namespace,
-          # prefer using ServiceDiscovery namespace ID instead of Route53 hosted zone ID.
-
-          set -e
-          echo "Import check completed"
-
-      - name: Terraform Refresh
-        working-directory: ${{ env.TERRAFORM_DIR }}
-        run: terraform refresh
-        continue-on-error: true
-
-      - name: Terraform Plan
-        id: plan
-        working-directory: ${{ env.TERRAFORM_DIR }}
-        run: |
-          terraform plan -no-color -out=tfplan
-          terraform show -no-color tfplan > plan.txt
-
-      - name: Comment PR with Plan
-        if: github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const plan = fs.readFileSync('${{ env.TERRAFORM_DIR }}/plan.txt', 'utf8');
-            const output = plan.length > 65000 ? plan.substring(0, 65000) + '...(truncated)' : plan;
-
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: `## Terraform Plan
-
-            <details><summary>Show Plan</summary>
-
-            \`\`\`terraform
-            ${output}
-            \`\`\`
-
-            </details>`
-            });
-
-      - name: Terraform Apply
-        if: |
-          (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')) ||
-          (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply')
-        working-directory: ${{ env.TERRAFORM_DIR }}
-        run: terraform apply -auto-approve tfplan
 
       - name: Terraform Destroy
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy'
-        working-directory: ${{ env.TERRAFORM_DIR }}
         run: terraform destroy -auto-approve
+        working-directory: ${{ env.TERRAFORM_DIR }}
 
       - name: Output Results
-        if: github.event_name != 'pull_request'
-        working-directory: ${{ env.TERRAFORM_DIR }}
         run: |
-          echo "## Terraform ${{ github.event.inputs.action || 'apply' }} Results" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-          if [[ "${{ github.event.inputs.action }}" == "destroy" ]]; then
-            echo "Resources destroyed successfully" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "Resources deployed successfully" >> $GITHUB_STEP_SUMMARY
-            if terraform output >/dev/null 2>&1; then
-              echo "" >> $GITHUB_STEP_SUMMARY
-              echo "### Outputs:" >> $GITHUB_STEP_SUMMARY
-              terraform output >> $GITHUB_STEP_SUMMARY
-            fi
-          fi
-
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Current State:" >> $GITHUB_STEP_SUMMARY
-          terraform state list >> $GITHUB_STEP_SUMMARY || echo "No resources in state" >> $GITHUB_STEP_SUMMARY
+          echo "## Terraform Destroy Results" >> $GITHUB_STEP_SUMMARY
+          echo "Resources destroyed successfully" >> $GITHUB_STEP_SUMMARY
+        working-directory: ${{ env.TERRAFORM_DIR }}
