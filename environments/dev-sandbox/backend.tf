@@ -1,14 +1,7 @@
 terraform {
-  required_version = ">= 1.5.0"
-
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.0"
-    }
+  backend "s3" {
+    bucket = "tesing-terraform-tf-statefiles"        # The S3 bucket name
+    key    = "dev-sandbox/terraform.tfstate"         # The path where the state file will be stored
+    region = "us-east-1"                             # The AWS region
   }
-
-  # Backend block tells Terraform we want to use remote S3 state.
-  # deploy.yml will pass the bucket/key/region values.
-  backend "s3" {}
 }
