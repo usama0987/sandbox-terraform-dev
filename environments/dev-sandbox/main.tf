@@ -1,49 +1,148 @@
-output "task_execution_role_arn" {
-     description = "ARN of the task execution role"
-     value       = aws_iam_role.task_execution_role[0].arn
-   }
+# AWS Provider Configuration
+terraform {
+  required_version = ">= 1.0"
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+}
 
-   output "task_role_arn" {
-     description = "ARN of the task role"
-     value       = aws_iam_role.task_role[0].arn
-   }
+provider "aws" {
+  region = "us-east-1"
 
-   output "cluster_id" {
-     description = "ID of the ECS cluster"
-     value       = aws_ecs_cluster.main.id
-   }
+  default_tags {
+    tags = {
+      Environment   = "dev-sandbox"
+      Project       = "dev-sandbox-ecs-infrastructure"
+      ManagedBy     = "terraform"
+      Owner         = "dev-team"
+      CostCenter    = "development"
+    }
+  }
+}
 
-   output "cluster_arn" {
-     description = "ARN of the ECS cluster"
-     value       = aws_ecs_cluster.main.arn
-   }
+# Local values for environment-specific configurations
+locals {
+  name_prefix = "dev-sandbox"
+  environment = "dev-sandbox"
+  region      = "us-east-1"
 
-   output "cluster_name" {
-     description = "Name of the ECS cluster"
-     value       = aws_ecs_cluster.main.name
-   }
+  # VPC Configuration
+  vpc_cidr             = "10.0.0.0/16"
+  public_subnet_cidrs  = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
+  private_subnet_cidrs = ["10.0.11.0/24", "10.0.12.0/24", "10.0.13.0/24"]
 
-   output "service_id" {
-     description = "ID of the ECS service"
-     value       = aws_ecs_service.app.id
-   }
+  # ECR Configuration
+  image_tag_mutability = "MUTABLE"
+  scan_on_push        = true
+  max_image_count     = 10
+  untagged_image_days = 7
 
-   output "service_name" {
-     description = "Name of the ECS service"
-     value       = aws_ecs_service.app.name
-   }
+  # ECS Configuration
+  task_cpu           = "512"
+  task_memory        = "1024"
+  desired_count      = 1  # Set to 1 for minimum and maximum 1 container
+  log_retention_days = 7
+  container_name     = "app"
+  container_port     = 5000
 
-   output "task_definition_arn" {
-     description = "ARN of the task definition"
-     value       = aws_ecs_task_definition.app.arn
-   }
+  # Application Configuration
+  container_image = "${module.ecr.repository_url}:latest"
+  environment_variables = [
+    {
+      name  = "ENVIRONMENT"
+      value = "dev-sandbox"
+    },
+    {
+      name  = "LOG_LEVEL"
+      value = "DEBUG"
+    },
+    {
+      name  = "PORT"
+      value = "5000"
+    }
+  ]
 
-   output "service_discovery_namespace_id" {
-     description = "ID of the service discovery namespace"
-     value       = aws_service_discovery_private_dns_namespace.main.id
-   }
+  # ALB Configuration
+  health_check_path = "/health"
+  ssl_policy       = "ELBSecurityPolicy-TLS-1-2-2017-01"
+}
 
-   output "cloudwatch_log_group_name" {
-     description = "Name of the CloudWatch log group"
-     value       = aws_cloudwatch_log_group.ecs_logs.name
-   }
+# VPC Module
+module "vpc" {
+  source = "../../modules/vpc"
+
+  name_prefix          = local.name_prefix
+  vpc_cidr             = local.vpc_cidr
+  public_subnet_cidrs  = local.public_subnet_cidrs
+  private_subnet_cidrs = local.private_subnet_cidrs
+}
+
+# Security Group Module
+module "security_group" {
+  source = "../../modules/security_groups"
+
+  name_prefix = local.name_prefix
+  vpc_id      = module.vpc.vpc_id
+}
+
+# ECR Module
+module "ecr" {
+  source = "../../modules/ecr"
+
+  name_prefix          = local.name_prefix
+  image_tag_mutability = local.image_tag_mutability
+  scan_on_push         = local.scan_on_push
+  encryption_type      = "AES256"
+  force_delete         = true
+  max_image_count      = local.max_image_count
+  untagged_image_days  = local.untagged_image_days
+  allowed_principals   = ["arn:aws:iam::527213286309:role/YourPushRole"] # Replace with actual IAM role ARN
+}
+
+# Application Load Balancer Module
+module "alb" {
+  source = "../../modules/alb"
+
+  name_prefix             = local.name_prefix
+  vpc_id                  = module.vpc.vpc_id
+  public_subnet_ids       = module.vpc.public_subnet_ids
+  security_group_ids      = [module.security_group.security_group_id]
+  health_check_path       = local.health_check_path
+  ssl_policy              = local.ssl_policy
+  enable_deletion_protection = false
+}
+
+# ECS Module
+module "ecs" {
+  source = "../../modules/ecs"
+
+  name_prefix           = local.name_prefix
+  vpc_id                = module.vpc.vpc_id
+  private_subnet_ids    = module.vpc.private_subnet_ids
+  security_group_ids    = [module.security_group.security_group_id]
+  target_group_arn      = module.alb.target_group_arn
+  container_image       = local.container_image
+  task_cpu              = local.task_cpu
+  task_memory           = local.task_memory
+  desired_count         = local.desired_count
+  log_retention_days    = local.log_retention_days
+  environment_variables = local.environment_variables
+  enable_container_insights = true
+  enable_health_check   = true
+  health_check_command  = ["CMD-SHELL", "curl -f http://localhost:${local.container_port}/health || exit 1"]
+  health_check_interval = 30
+  health_check_timeout  = 5
+  health_check_retries  = 3
+  health_check_start_period = 60
+  container_name        = local.container_name
+  container_port        = local.container_port
+  platform_version      = "1.4.0"
+  deployment_maximum_percent = 200
+  deployment_minimum_healthy_percent = 100
+  enable_deployment_circuit_breaker = true
+  enable_deployment_rollback = true
+  enable_execute_command = false
+}
