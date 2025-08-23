@@ -1,3 +1,89 @@
+Skip to content
+Chat history
+
+You said:
+module.ecs.aws_ecs_cluster_capacity_providers.main: Still creating... [10s elapsed]
+module.ecs.aws_ecs_cluster_capacity_providers.main: Creation complete after 10s [id=dev-sandbox-cluster]
+╷
+│ Error: creating ECR Repository (dev-sandbox-repository): operation error ECR: CreateRepository, https response error StatusCode: 400, RequestID: 21c222cd-5c41-44f1-a465-63b1b337ae2e, RepositoryAlreadyExistsException: The repository with name 'dev-sandbox-repository' already exists in the registry with id '527213286309'
+│ 
+│   with module.ecr.aws_ecr_repository.main,
+│   on ../../modules/ecr/main.tf line 2, in resource "aws_ecr_repository" "main":
+│    2: resource "aws_ecr_repository" "main" {
+│ 
+╵
+╷
+│ Error: creating IAM Role (dev-sandbox-ecs-task-execution-role): operation error IAM: CreateRole, https response error StatusCode: 409, RequestID: c0a18541-66d2-4168-895a-8394000f9f7d, EntityAlreadyExists: Role with name dev-sandbox-ecs-task-execution-role already exists.
+│ 
+│   with module.ecr.aws_iam_role.ecs_task_execution_role,
+│   on ../../modules/ecr/main.tf line 97, in resource "aws_iam_role" "ecs_task_execution_role":
+│   97: resource "aws_iam_role" "ecs_task_execution_role" {
+│ 
+╵
+╷
+│ Error: creating IAM Role (dev-sandbox-ecs-task-role): operation error IAM: CreateRole, https response error StatusCode: 409, RequestID: 87a549e6-d5af-4d08-9ef7-3ff92733b164, EntityAlreadyExists: Role with name dev-sandbox-ecs-task-role already exists.
+│ 
+│   with module.ecr.aws_iam_role.ecs_task_role,
+│   on ../../modules/ecr/main.tf line 131, in resource "aws_iam_role" "ecs_task_role":
+│  131: resource "aws_iam_role" "ecs_task_role" {
+│ 
+╵
+╷
+│ Error: creating CloudWatch Logs Log Group (/aws/ecs/dev-sandbox): operation error CloudWatch Logs: CreateLogGroup, https response error StatusCode: 400, RequestID: d6a1146a-00b6-4ecd-892f-3fdb5453f33c, ResourceAlreadyExistsException: The specified log group already exists
+│ 
+│   with module.ecs.aws_cloudwatch_log_group.ecs_logs,
+│   on ../../modules/ecs/main.tf line 10, in resource "aws_cloudwatch_log_group" "ecs_logs":
+│   10: resource "aws_cloudwatch_log_group" "ecs_logs" {
+│ 
+╵
+╷
+│ Error: creating IAM Role (dev-sandbox-task-execution-role): operation error IAM: CreateRole, https response error StatusCode: 409, RequestID: e0baec29-fa30-471d-bd44-9c0d3b02bba4, EntityAlreadyExists: Role with name dev-sandbox-task-execution-role already exists.
+│ 
+│   with module.ecs.aws_iam_role.task_execution_role[0],
+│   on ../../modules/ecs/main.tf line 78, in resource "aws_iam_role" "task_execution_role":
+│   78: resource "aws_iam_role" "task_execution_role" {
+│ 
+╵
+╷
+│ Error: creating IAM Role (dev-sandbox-task-role): operation error IAM: CreateRole, https response error StatusCode: 409, RequestID: 0d70702e-0a08-4d98-9318-2af2ac398597, EntityAlreadyExists: Role with name dev-sandbox-task-role already exists.
+│ 
+│   with module.ecs.aws_iam_role.task_role[0],
+│   on ../../modules/ecs/main.tf line 129, in resource "aws_iam_role" "task_role":
+│  129: resource "aws_iam_role" "task_role" {
+│ 
+╵
+╷
+│ Error: creating EC2 VPC: operation error EC2: CreateVpc, https response error StatusCode: 400, RequestID: c945ab6d-4bef-4ea3-96a0-4d0225c76414, api error VpcLimitExceeded: The maximum number of VPCs has been reached.
+│ 
+│   with module.vpc.aws_vpc.main,
+│   on ../../modules/vpc/main.tf line 8, in resource "aws_vpc" "main":
+│    8: resource "aws_vpc" "main" {
+│ 
+╵
+Error: Terraform exited with code 1.
+Error: Process completed with exit code 1.
+
+
+
+
+I am using s3 bucket to manage .tf state file as backend like if there is any .tf file exixts skip the resource other wise create the resource.
+
+
+i am giving you my deploy.yml check if there is any missing logic
+
+
+give me back only deploy.yml with complete and correct logic
+
+
+also giving you .tf state file that is available in the bucket
+
+
+
+
+
+deploy.yml
+
+
 name: 'Terraform Deploy - Dev Sandbox'
 
 on:
@@ -94,7 +180,7 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: '❌ **Terraform Format Check Failed**\n\nPlease run `terraform fmt -recursive` to fix formatting issues.'
+              body: '❌ **Terraform Format Check Failed**\n\nPlease run terraform fmt -recursive to fix formatting issues.'
             })
 
   terraform-plan:
@@ -193,21 +279,21 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `## 📋 Terraform Plan Results
+              body: ## 📋 Terraform Plan Results
             
             <details>
             <summary>Show Plan Output</summary>
             
-            \`\`\`terraform
+            \\\terraform
             ${truncatedOutput}
-            \`\`\`
+            \\\
             
             </details>
             
             **Plan Status:** ${{ steps.plan.outcome == 'success' && '✅ Success' || '❌ Failed' }}
             **Refresh Status:** ${{ steps.refresh.outcome == 'success' && '✅ Success' || '⚠️ Partial' }}
             
-            > 💡 To apply these changes, merge this PR or run the workflow manually with 'apply' action.`
+            > 💡 To apply these changes, merge this PR or run the workflow manually with 'apply' action.
             })
 
   terraform-refresh:
@@ -292,7 +378,7 @@ jobs:
           
           # Check VPC limit issue - find unused VPCs
           echo "Checking for unused VPCs..."
-          aws ec2 describe-vpcs --query 'Vpcs[?State==`available`].[VpcId,Tags[?Key==`Name`].Value|[0]]' --output table
+          aws ec2 describe-vpcs --query 'Vpcs[?State==available].[VpcId,Tags[?Key==Name].Value|[0]]' --output table
           
           # Check if we can use existing VPC
           EXISTING_VPC=$(aws ec2 describe-vpcs --filters "Name=tag:Name,Values=dev-sandbox-vpc" --query 'Vpcs[0].VpcId' --output text 2>/dev/null)
@@ -463,3 +549,373 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Remaining State:" >> $GITHUB_STEP_SUMMARY
           terraform state list >> $GITHUB_STEP_SUMMARY || echo "State is empty" >> $GITHUB_STEP_SUMMARY
+ChatGPT said:
+
+Thought for 7s
+name: 'Terraform Deploy - Dev Sandbox'
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'environments/**'
+      - 'modules/**'
+      - '.github/workflows/**'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'environments/**'
+      - 'modules/**'
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Terraform Action'
+        required: true
+        default: 'plan'
+        type: choice
+        options: [ plan, apply, destroy, refresh, import ]
+
+env:
+  TF_VERSION: '1.5.0'
+  AWS_REGION: 'us-east-1'
+  TERRAFORM_DIR: 'environments/dev-sandbox'
+  TF_IN_AUTOMATION: 'true'
+
+jobs:
+  terraform-validate:
+    name: 'Terraform Validate'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform fmt (modules)
+        run: terraform fmt -check -recursive
+        working-directory: ./modules
+        continue-on-error: true
+
+      - name: Terraform Init
+        run: terraform init -reconfigure
+        working-directory: ${{ env.TERRAFORM_DIR }}
+
+      - name: Terraform Validate
+        run: terraform validate
+        working-directory: ${{ env.TERRAFORM_DIR }}
+
+  terraform-plan:
+    name: 'Terraform Plan'
+    runs-on: ubuntu-latest
+    needs: terraform-validate
+    if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'plan')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform Init
+        run: terraform init -reconfigure
+        working-directory: ${{ env.TERRAFORM_DIR }}
+
+      - name: Auto-Import Existing Resources (idempotency guard)
+        id: autoimport
+        run: |
+          set -euo pipefail
+          cd "${{ env.TERRAFORM_DIR }}"
+
+          echo ">>> Checking and importing pre-existing AWS resources into state (safe/idempotent)..."
+
+          # ---- ECR Repository ----
+          if aws ecr describe-repositories --repository-names dev-sandbox-repository --region "${{ env.AWS_REGION }}" >/dev/null 2>&1; then
+            if ! terraform state show module.ecr.aws_ecr_repository.main >/dev/null 2>&1; then
+              echo "Importing ECR repository: dev-sandbox-repository"
+              terraform import -lock=false module.ecr.aws_ecr_repository.main dev-sandbox-repository || true
+            fi
+          fi
+
+          # ---- IAM Roles (module.ecr) ----
+          if aws iam get-role --role-name dev-sandbox-ecs-task-execution-role >/dev/null 2>&1; then
+            if ! terraform state show module.ecr.aws_iam_role.ecs_task_execution_role >/dev/null 2>&1; then
+              echo "Importing IAM role: dev-sandbox-ecs-task-execution-role (module.ecr)"
+              terraform import -lock=false module.ecr.aws_iam_role.ecs_task_execution_role dev-sandbox-ecs-task-execution-role || true
+            fi
+          fi
+          if aws iam get-role --role-name dev-sandbox-ecs-task-role >/dev/null 2>&1; then
+            if ! terraform state show module.ecr.aws_iam_role.ecs_task_role >/dev/null 2>&1; then
+              echo "Importing IAM role: dev-sandbox-ecs-task-role (module.ecr)"
+              terraform import -lock=false module.ecr.aws_iam_role.ecs_task_role dev-sandbox-ecs-task-role || true
+            fi
+          fi
+
+          # ---- IAM Roles (module.ecs) ----
+          if aws iam get-role --role-name dev-sandbox-task-execution-role >/dev/null 2>&1; then
+            if ! terraform state show module.ecs.aws_iam_role.task_execution_role[0] >/dev/null 2>&1; then
+              echo "Importing IAM role: dev-sandbox-task-execution-role (module.ecs)"
+              terraform import -lock=false 'module.ecs.aws_iam_role.task_execution_role[0]' dev-sandbox-task-execution-role || true
+            fi
+          fi
+          if aws iam get-role --role-name dev-sandbox-task-role >/dev/null 2>&1; then
+            if ! terraform state show module.ecs.aws_iam_role.task_role[0] >/dev/null 2>&1; then
+              echo "Importing IAM role: dev-sandbox-task-role (module.ecs)"
+              terraform import -lock=false 'module.ecs.aws_iam_role.task_role[0]' dev-sandbox-task-role || true
+            fi
+          fi
+
+          # ---- CloudWatch Log Group ----
+          if aws logs describe-log-groups --log-group-name-prefix "/aws/ecs/dev-sandbox" --query 'logGroups[?logGroupName==`/aws/ecs/dev-sandbox`].logGroupName' --output text | grep -q "/aws/ecs/dev-sandbox"; then
+            if ! terraform state show module.ecs.aws_cloudwatch_log_group.ecs_logs >/dev/null 2>&1; then
+              echo "Importing CloudWatch Log Group: /aws/ecs/dev-sandbox"
+              terraform import -lock=false module.ecs.aws_cloudwatch_log_group.ecs_logs "/aws/ecs/dev-sandbox" || true
+            fi
+          fi
+
+          # ---- VPC (tag: Name=dev-sandbox-vpc) ----
+          VPC_ID=$(aws ec2 describe-vpcs --filters "Name=tag:Name,Values=dev-sandbox-vpc" --query 'Vpcs[0].VpcId' --output text 2>/dev/null || true)
+          if [[ -n "${VPC_ID}" && "${VPC_ID}" != "None" ]]; then
+            if ! terraform state show module.vpc.aws_vpc.main >/dev/null 2>&1; then
+              echo "Importing VPC: ${VPC_ID}"
+              terraform import -lock=false module.vpc.aws_vpc.main "${VPC_ID}" || true
+            fi
+          fi
+
+          echo ">>> Auto-import step complete."
+
+      - name: Refresh-only (sync drift)
+        run: |
+          cd "${{ env.TERRAFORM_DIR }}"
+          terraform plan -refresh-only -no-color -out=refresh.plan || true
+          terraform show -no-color refresh.plan || true
+
+      - name: Terraform Plan
+        run: |
+          cd "${{ env.TERRAFORM_DIR }}"
+          terraform plan -no-color -out=tfplan
+          terraform show -no-color tfplan > plan_output.txt
+
+      - name: Upload Plan Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-plan
+          path: |
+            ${{ env.TERRAFORM_DIR }}/tfplan
+            ${{ env.TERRAFORM_DIR }}/plan_output.txt
+          retention-days: 5
+
+  terraform-refresh:
+    name: 'Terraform Refresh'
+    runs-on: ubuntu-latest
+    needs: terraform-validate
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'refresh'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform Init
+        run: terraform init -reconfigure
+        working-directory: ${{ env.TERRAFORM_DIR }}
+
+      - name: Auto-Import Existing Resources
+        run: |
+          set -euo pipefail
+          cd "${{ env.TERRAFORM_DIR }}"
+          # Reuse same imports as in plan job
+          # (kept minimal here for brevity)
+          if aws ecr describe-repositories --repository-names dev-sandbox-repository --region "${{ env.AWS_REGION }}" >/dev/null 2>&1; then
+            terraform state show module.ecr.aws_ecr_repository.main >/dev/null 2>&1 || terraform import -lock=false module.ecr.aws_ecr_repository.main dev-sandbox-repository || true
+          fi
+
+      - name: Terraform Refresh
+        run: terraform refresh
+        working-directory: ${{ env.TERRAFORM_DIR }}
+
+      - name: Show State
+        run: terraform state list || true
+        working-directory: ${{ env.TERRAFORM_DIR }}
+
+  terraform-apply:
+    name: 'Terraform Apply'
+    runs-on: ubuntu-latest
+    needs: terraform-validate
+    if: |
+      ((github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') && github.event_name == 'push') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform Init
+        run: terraform init -reconfigure
+        working-directory: ${{ env.TERRAFORM_DIR }}
+
+      - name: Auto-Import Existing Resources (idempotency guard)
+        run: |
+          set -euo pipefail
+          cd "${{ env.TERRAFORM_DIR }}"
+
+          # ECR
+          if aws ecr describe-repositories --repository-names dev-sandbox-repository --region "${{ env.AWS_REGION }}" >/dev/null 2>&1; then
+            terraform state show module.ecr.aws_ecr_repository.main >/dev/null 2>&1 || terraform import -lock=false module.ecr.aws_ecr_repository.main dev-sandbox-repository || true
+          fi
+
+          # IAM roles (module.ecr)
+          terraform state show module.ecr.aws_iam_role.ecs_task_execution_role >/dev/null 2>&1 || (aws iam get-role --role-name dev-sandbox-ecs-task-execution-role >/dev/null 2>&1 && terraform import -lock=false module.ecr.aws_iam_role.ecs_task_execution_role dev-sandbox-ecs-task-execution-role || true)
+          terraform state show module.ecr.aws_iam_role.ecs_task_role >/dev/null 2>&1 || (aws iam get-role --role-name dev-sandbox-ecs-task-role >/dev/null 2>&1 && terraform import -lock=false module.ecr.aws_iam_role.ecs_task_role dev-sandbox-ecs-task-role || true)
+
+          # IAM roles (module.ecs)
+          terraform state show 'module.ecs.aws_iam_role.task_execution_role[0]' >/dev/null 2>&1 || (aws iam get-role --role-name dev-sandbox-task-execution-role >/dev/null 2>&1 && terraform import -lock=false 'module.ecs.aws_iam_role.task_execution_role[0]' dev-sandbox-task-execution-role || true)
+          terraform state show 'module.ecs.aws_iam_role.task_role[0]' >/dev/null 2>&1 || (aws iam get-role --role-name dev-sandbox-task-role >/dev/null 2>&1 && terraform import -lock=false 'module.ecs.aws_iam_role.task_role[0]' dev-sandbox-task-role || true)
+
+          # Log group
+          if aws logs describe-log-groups --log-group-name-prefix "/aws/ecs/dev-sandbox" --query 'logGroups[?logGroupName==`/aws/ecs/dev-sandbox`].logGroupName' --output text | grep -q "/aws/ecs/dev-sandbox"; then
+            terraform state show module.ecs.aws_cloudwatch_log_group.ecs_logs >/dev/null 2>&1 || terraform import -lock=false module.ecs.aws_cloudwatch_log_group.ecs_logs "/aws/ecs/dev-sandbox" || true
+          fi
+
+          # VPC (avoid VpcLimitExceeded by reusing/importing)
+          VPC_ID=$(aws ec2 describe-vpcs --filters "Name=tag:Name,Values=dev-sandbox-vpc" --query 'Vpcs[0].VpcId' --output text 2>/dev/null || true)
+          if [[ -n "${VPC_ID}" && "${VPC_ID}" != "None" ]]; then
+            terraform state show module.vpc.aws_vpc.main >/dev/null 2>&1 || terraform import -lock=false module.vpc.aws_vpc.main "${VPC_ID}" || true
+          fi
+
+      - name: Refresh-only (sync drift)
+        run: |
+          cd "${{ env.TERRAFORM_DIR }}"
+          terraform plan -refresh-only -no-color -out=refresh.plan || true
+          terraform apply -auto-approve refresh.plan || true
+
+      - name: Terraform Plan
+        run: |
+          cd "${{ env.TERRAFORM_DIR }}"
+          terraform plan -no-color -out=tfplan
+
+      - name: Terraform Apply
+        run: |
+          cd "${{ env.TERRAFORM_DIR }}"
+          terraform apply -auto-approve tfplan
+          # safe outputs
+          terraform output -json || true
+
+  terraform-import:
+    name: 'Terraform Import (manual)'
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'import'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform Init
+        run: terraform init -reconfigure
+        working-directory: ${{ env.TERRAFORM_DIR }}
+
+      - name: Import Known Resources
+        run: |
+          set -euo pipefail
+          cd "${{ env.TERRAFORM_DIR }}"
+          # Same import set as auto-import (kept concise)
+          aws ecr describe-repositories --repository-names dev-sandbox-repository --region "${{ env.AWS_REGION }}" >/dev/null 2>&1 && terraform state show module.ecr.aws_ecr_repository.main >/dev/null 2>&1 || terraform import -lock=false module.ecr.aws_ecr_repository.main dev-sandbox-repository || true
+          aws iam get-role --role-name dev-sandbox-ecs-task-execution-role >/dev/null 2>&1 && terraform state show module.ecr.aws_iam_role.ecs_task_execution_role >/dev/null 2>&1 || terraform import -lock=false module.ecr.aws_iam_role.ecs_task_execution_role dev-sandbox-ecs-task-execution-role || true
+          aws iam get-role --role-name dev-sandbox-ecs-task-role >/dev/null 2>&1 && terraform state show module.ecr.aws_iam_role.ecs_task_role >/dev/null 2>&1 || terraform import -lock=false module.ecr.aws_iam_role.ecs_task_role dev-sandbox-ecs-task-role || true
+          aws iam get-role --role-name dev-sandbox-task-execution-role >/dev/null 2>&1 && terraform state show 'module.ecs.aws_iam_role.task_execution_role[0]' >/dev/null 2>&1 || terraform import -lock=false 'module.ecs.aws_iam_role.task_execution_role[0]' dev-sandbox-task-execution-role || true
+          aws iam get-role --role-name dev-sandbox-task-role >/dev/null 2>&1 && terraform state show 'module.ecs.aws_iam_role.task_role[0]' >/dev/null 2>&1 || terraform import -lock=false 'module.ecs.aws_iam_role.task_role[0]' dev-sandbox-task-role || true
+          aws logs describe-log-groups --log-group-name-prefix "/aws/ecs/dev-sandbox" --query 'logGroups[?logGroupName==`/aws/ecs/dev-sandbox`].logGroupName' --output text | grep -q "/aws/ecs/dev-sandbox" && terraform state show module.ecs.aws_cloudwatch_log_group.ecs_logs >/dev/null 2>&1 || terraform import -lock=false module.ecs.aws_cloudwatch_log_group.ecs_logs "/aws/ecs/dev-sandbox" || true
+          VPC_ID=$(aws ec2 describe-vpcs --filters "Name=tag:Name,Values=dev-sandbox-vpc" --query 'Vpcs[0].VpcId' --output text 2>/dev/null || true)
+          if [[ -n "${VPC_ID}" && "${VPC_ID}" != "None" ]]; then
+            terraform state show module.vpc.aws_vpc.main >/dev/null 2>&1 || terraform import -lock=false module.vpc.aws_vpc.main "${VPC_ID}" || true
+          fi
+
+      - name: Show State
+        run: terraform state list || true
+        working-directory: ${{ env.TERRAFORM_DIR }}
+
+  terraform-destroy:
+    name: 'Terraform Destroy'
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform Init
+        run: terraform init -reconfigure
+        working-directory: ${{ env.TERRAFORM_DIR }}
+
+      - name: Terraform Refresh (best-effort)
+        run: terraform plan -refresh-only -out=refresh.plan || true
+        working-directory: ${{ env.TERRAFORM_DIR }}
+
+      - name: Terraform Destroy
+        run: terraform destroy -auto-approve -refresh=true
+        working-directory: ${{ env.TERRAFORM_DIR }}
+
+
+No file chosenNo file chosen
+ChatGPT can make mistakes. Check important info.
