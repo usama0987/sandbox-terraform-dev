@@ -132,6 +132,21 @@ module "ecs" {
   desired_count         = local.desired_count
   log_retention_days    = local.log_retention_days
   environment_variables = local.environment_variables
-  task_execution_role_arn = module.ecs.aws_iam_role.task_execution_role.arn # Reference internal role
-  task_role_arn         = module.ecs.aws_iam_role.task_role.arn            # Reference internal role
+  max_capacity          = local.max_capacity
+  min_capacity          = local.min_capacity
+  cpu_target_value      = local.cpu_target_value
+  memory_target_value   = local.memory_target_value
+  enable_container_insights = true # Example value, adjust as needed
+  enable_health_check   = true    # Example value, adjust as needed
+  health_check_command  = ["CMD-SHELL", "curl -f http://localhost:5000/health || exit 1"]
+  health_check_interval = 30
+  health_check_timeout  = 5
+  health_check_retries  = 3
+  health_check_start_period = 60
+  platform_version      = "1.4.0"  # Example value, adjust as needed
+  deployment_maximum_percent = 200
+  deployment_minimum_healthy_percent = 100
+  enable_deployment_circuit_breaker = true
+  enable_deployment_rollback = true
+  enable_execute_command = false   # Example value, adjust as needed
 }
