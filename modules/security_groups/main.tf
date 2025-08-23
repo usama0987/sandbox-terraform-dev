@@ -1,9 +1,16 @@
 resource "aws_security_group" "main" {
-  name        = "${var.name_prefix}-sg"
+  name        = "${var.name_prefix}-alb-ecs-sg"
   description = "Security group for ECS and ALB in ${coalesce(var.environment, "dev-sandbox")}"
   vpc_id      = var.vpc_id
 
-  # Allow HTTP from anywhere
+  # Ingress rules
+  ingress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    self        = true
+  }
+
   ingress {
     from_port   = 80
     to_port     = 80
@@ -11,7 +18,6 @@ resource "aws_security_group" "main" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # Allow HTTPS from anywhere
   ingress {
     from_port   = 443
     to_port     = 443
@@ -19,7 +25,7 @@ resource "aws_security_group" "main" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # Allow outbound traffic
+  # Egress rules
   egress {
     from_port   = 0
     to_port     = 0
@@ -28,12 +34,7 @@ resource "aws_security_group" "main" {
   }
 
   tags = {
-    Name        = "${var.name_prefix}-sg"
+    Name        = "${var.name_prefix}-alb-ecs-sg"
     Environment = coalesce(var.environment, "dev-sandbox")
   }
-}
-
-output "security_group_id" {
-  description = "ID of the security group"
-  value       = aws_security_group.main.id
 }
