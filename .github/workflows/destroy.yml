@@ -1,0 +1,90 @@
+name: 'Terraform Destroy - Dev Sandbox'
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type DESTROY to confirm tearing down the dev-sandbox"
+        required: true
+        default: ""
+      aws_region:
+        description: "AWS region (overrides default)"
+        required: false
+        default: "us-east-1"
+      tf_dir:
+        description: "Terraform working directory"
+        required: false
+        default: "environments/dev-sandbox"
+
+env:
+  TF_VERSION: '1.5.0'
+  AWS_REGION: ${{ inputs.aws_region || 'us-east-1' }}
+  TERRAFORM_DIR: ${{ inputs.tf_dir || 'environments/dev-sandbox' }}
+  TF_VAR_force_destroy: 'true'
+
+jobs:
+  terraform-destroy:
+    name: 'Terraform Destroy'
+    runs-on: ubuntu-latest
+    environment: dev-sandbox
+
+    steps:
+      - name: Safety Check
+        run: |
+          if [ "${{ inputs.confirm }}" != "DESTROY" ]; then
+            echo "Refusing to run: you must type DESTROY to proceed."
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform Init
+        working-directory: ${{ env.TERRAFORM_DIR }}
+        run: terraform init -reconfigure
+
+      # Optional: refresh to get latest remote state / drift info
+      - name: Terraform Refresh (best effort)
+        working-directory: ${{ env.TERRAFORM_DIR }}
+        run: terraform refresh || true
+
+      - name: Terraform Plan Destroy
+        id: plan
+        working-directory: ${{ env.TERRAFORM_DIR }}
+        run: |
+          terraform plan -destroy -no-color -out=tfplan
+          terraform show -no-color tfplan > destroy-plan.txt
+
+      - name: Upload Destroy Plan Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: destroy-plan
+          path: ${{ env.TERRAFORM_DIR }}/destroy-plan.txt
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Terraform Destroy
+        working-directory: ${{ env.TERRAFORM_DIR }}
+        run: terraform apply -auto-approve tfplan
+
+      - name: Output Results
+        working-directory: ${{ env.TERRAFORM_DIR }}
+        run: |
+          echo "## Terraform Destroy Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Resources destroyed successfully." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### State after destroy:" >> $GITHUB_STEP_SUMMARY
+          terraform state list >> $GITHUB_STEP_SUMMARY || echo "No resources in state" >> $GITHUB_STEP_SUMMARY
