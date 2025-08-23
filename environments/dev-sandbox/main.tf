@@ -45,7 +45,7 @@ locals {
   task_memory        = "1024"
   desired_count      = 2
   min_capacity       = 1
-  max_capacity       = 6
+  max_capacity       = 2
   cpu_target_value   = 70
   memory_target_value = 80
   log_retention_days = 7
