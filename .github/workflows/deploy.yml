@@ -2,11 +2,19 @@ name: 'Terraform Deploy - Dev Sandbox'
 
 on:
   push:
-    branches: [main, develop]
-    paths: ['environments/**', 'modules/**']
+    branches:
+      - main
+      - develop
+    paths:
+      - 'environments/**'
+      - 'modules/**'
   pull_request:
-    branches: [main, develop]
-    paths: ['environments/**', 'modules/**']
+    branches:
+      - main
+      - develop
+    paths:
+      - 'environments/**'
+      - 'modules/**'
   workflow_dispatch:
     inputs:
       action:
@@ -14,7 +22,10 @@ on:
         required: true
         default: 'plan'
         type: choice
-        options: [plan, apply, destroy]
+        options:
+          - plan
+          - apply
+          - destroy
 
 env:
   TF_VERSION: '1.5.0'
