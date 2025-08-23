@@ -1,3 +1,4 @@
+
 # AWS Provider Configuration
 terraform {
   required_version = ">= 1.0"
@@ -119,30 +120,30 @@ module "alb" {
 module "ecs" {
   source = "../../modules/ecs"
 
-  name_prefix                            = local.name_prefix
-  vpc_id                                 = module.vpc.vpc_id
-  private_subnet_ids                     = module.vpc.private_subnet_ids
-  security_group_ids                     = [module.security_group.security_group_id]
-  target_group_arn                       = module.alb.target_group_arn
-  container_image                        = local.container_image
-  task_cpu                               = local.task_cpu
-  task_memory                            = local.task_memory
-  desired_count                          = local.desired_count
-  log_retention_days                     = local.log_retention_days
-  environment_variables                  = local.environment_variables
-  enable_container_insights              = true
-  enable_health_check                    = true
-  health_check_command                   = ["CMD-SHELL", "curl -f http://localhost:${local.container_port}/health || exit 1"]
-  health_check_interval                  = 30
-  health_check_timeout                   = 5
-  health_check_retries                   = 3
-  health_check_start_period              = 60
-  container_name                         = local.container_name
-  container_port                         = local.container_port
-  platform_version                       = "1.4.0"
-  deployment_maximum_percent             = 200
-  deployment_minimum_healthy_percent     = 100
-  enable_deployment_circuit_breaker      = true
-  enable_deployment_rollback             = true
-  enable_execute_command                 = false
+  name_prefix                        = local.name_prefix
+  vpc_id                             = module.vpc.vpc_id
+  private_subnet_ids                 = module.vpc.private_subnet_ids
+  security_group_ids                 = [module.security_group.security_group_id]
+  target_group_arn                   = module.alb.target_group_arn
+  container_image                    = local.container_image
+  task_cpu                           = local.task_cpu
+  task_memory                        = local.task_memory
+  desired_count                      = local.desired_count
+  log_retention_days                 = local.log_retention_days
+  environment_variables              = local.environment_variables
+  enable_container_insights          = true
+  enable_health_check                = true
+  health_check_command               = ["CMD-SHELL", "curl -f http://localhost:${local.container_port}/health || exit 1"]
+  health_check_interval              = 30
+  health_check_timeout               = 5
+  health_check_retries               = 3
+  health_check_start_period          = 60
+  container_name                     = local.container_name
+  container_port                     = local.container_port
+  platform_version                   = "1.4.0"
+  deployment_maximum_percent         = 200
+  deployment_minimum_healthy_percent = 100
+  enable_deployment_circuit_breaker  = true
+  enable_deployment_rollback         = true
+  enable_execute_command             = false
 }
