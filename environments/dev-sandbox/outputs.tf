@@ -117,8 +117,8 @@ output "target_group_arn" {
 output "application_urls" {
   description = "URLs to access the application"
   value = {
-    http_url    = "http://${module.alb.alb_dns_name}"
-    direct_url  = "http://${module.alb.alb_dns_name}:${local.container_port}"
+    http_url   = "http://${module.alb.alb_dns_name}"
+    direct_url = "http://${module.alb.alb_dns_name}:${local.container_port}"
   }
 }
 
@@ -126,11 +126,11 @@ output "application_urls" {
 output "environment_info" {
   description = "Environment configuration information"
   value = {
-    environment     = "dev-sandbox"
-    region          = "us-east-1"
-    vpc_cidr        = local.vpc_cidr
-    desired_count   = local.desired_count
-    task_cpu        = local.task_cpu
-    task_memory     = local.task_memory
+    environment   = "dev-sandbox"
+    region        = "us-east-1"
+    vpc_cidr      = local.vpc_cidr
+    desired_count = local.desired_count
+    task_cpu      = local.task_cpu
+    task_memory   = local.task_memory
   }
 }
