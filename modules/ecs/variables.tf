@@ -1,149 +1,67 @@
-
 variable "name_prefix" {
-  description = "Name prefix for all resources"
+  description = "Prefix for resource names"
   type        = string
 }
 
 variable "vpc_id" {
-  description = "ID of the VPC where ECS resources will be created"
+  description = "VPC ID for the ECS service"
   type        = string
 }
 
 variable "private_subnet_ids" {
-  description = "List of private subnet IDs where ECS service will be deployed"
+  description = "List of private subnet IDs"
   type        = list(string)
 }
 
 variable "security_group_ids" {
-  description = "List of security group IDs to attach to ECS service"
+  description = "List of security group IDs"
   type        = list(string)
 }
 
 variable "target_group_arn" {
-  description = "ARN of the load balancer target group"
+  description = "ARN of the target group"
   type        = string
-}
-
-variable "task_execution_role_arn" {
-  description = "ARN of the task execution role"
-  type        = string
-}
-
-variable "task_role_arn" {
-  description = "ARN of the task role"
-  type        = string
-}
-
-variable "service_name" {
-  description = "Name of the service for service discovery"
-  type        = string
-  default     = "app"
-}
-
-variable "container_name" {
-  description = "Name of the container"
-  type        = string
-  default     = "app"
 }
 
 variable "container_image" {
   description = "Docker image for the container"
   type        = string
-  default     = "nginx:latest"
-}
-
-variable "container_port" {
-  description = "Port on which the container listens"
-  type        = number
-  default     = 5000
 }
 
 variable "task_cpu" {
-  description = "CPU units for the task (256, 512, 1024, 2048, 4096)"
+  description = "CPU units for the task"
   type        = string
-  default     = "256"
 }
 
 variable "task_memory" {
-  description = "Memory for the task in MiB"
+  description = "Memory for the task (in MiB)"
   type        = string
-  default     = "512"
 }
 
 variable "desired_count" {
   description = "Desired number of tasks"
   type        = number
-  default     = 1
-}
-
-variable "platform_version" {
-  description = "Platform version for Fargate"
-  type        = string
-  default     = "LATEST"
-}
-
-variable "deployment_maximum_percent" {
-  description = "Maximum percentage of tasks that can be running during deployment"
-  type        = number
-  default     = 200
-}
-
-variable "deployment_minimum_healthy_percent" {
-  description = "Minimum percentage of healthy tasks during deployment"
-  type        = number
-  default     = 50
-}
-
-variable "enable_deployment_circuit_breaker" {
-  description = "Enable deployment circuit breaker"
-  type        = bool
-  default     = true
-}
-
-variable "enable_deployment_rollback" {
-  description = "Enable automatic rollback on deployment failure"
-  type        = bool
-  default     = true
-}
-
-variable "enable_execute_command" {
-  description = "Enable ECS Exec for debugging"
-  type        = bool
-  default     = false
-}
-
-variable "enable_container_insights" {
-  description = "Enable CloudWatch Container Insights"
-  type        = bool
-  default     = true
 }
 
 variable "log_retention_days" {
-  description = "Number of days to retain CloudWatch logs"
+  description = "Retention period for CloudWatch logs (in days)"
   type        = number
-  default     = 7
 }
 
 variable "environment_variables" {
   description = "Environment variables for the container"
-  type = list(object({
-    name  = string
-    value = string
-  }))
-  default = []
+  type        = list(map(string))
+  default     = []
 }
 
-variable "secrets" {
-  description = "Secrets for the container from AWS Secrets Manager or SSM Parameter Store"
-  type = list(object({
-    name      = string
-    valueFrom = string
-  }))
-  default = []
+variable "enable_container_insights" {
+  description = "Enable Container Insights"
+  type        = bool
+  default     = false
 }
 
 variable "enable_health_check" {
-  description = "Enable container health check"
+  description = "Enable health check"
   type        = bool
   default     = false
 }
@@ -151,29 +69,123 @@ variable "enable_health_check" {
 variable "health_check_command" {
   description = "Health check command"
   type        = list(string)
-  default     = ["CMD-SHELL", "curl -f http://localhost:5000/ || exit 1"]
+  default     = []
 }
 
 variable "health_check_interval" {
-  description = "Health check interval in seconds"
+  description = "Health check interval (in seconds)"
   type        = number
   default     = 30
 }
 
 variable "health_check_timeout" {
-  description = "Health check timeout in seconds"
+  description = "Health check timeout (in seconds)"
   type        = number
   default     = 5
 }
 
 variable "health_check_retries" {
-  description = "Number of health check retries"
+  description = "Health check retries"
   type        = number
   default     = 3
 }
 
 variable "health_check_start_period" {
-  description = "Health check start period in seconds"
+  description = "Health check start period (in seconds)"
   type        = number
-  default     = 60
+  default     = 0
+}
+
+variable "container_name" {
+  description = "Name of the container"
+  type        = string
+}
+
+variable "container_port" {
+  description = "Port the container listens on"
+  type        = number
+}
+
+variable "platform_version" {
+  description = "Fargate platform version"
+  type        = string
+  default     = "1.4.0"
+}
+
+variable "deployment_maximum_percent" {
+  description = "Maximum percent for deployment"
+  type        = number
+  default     = 200
+}
+
+variable "deployment_minimum_healthy_percent" {
+  description = "Minimum healthy percent for deployment"
+  type        = number
+  default     = 100
+}
+
+variable "enable_deployment_circuit_breaker" {
+  description = "Enable deployment circuit breaker"
+  type        = bool
+  default     = false
+}
+
+variable "enable_deployment_rollback" {
+  description = "Enable deployment rollback"
+  type        = bool
+  default     = false
+}
+
+variable "enable_execute_command" {
+  description = "Enable execute command"
+  type        = bool
+  default     = false
+}
+
+variable "service_name" {
+  description = "Name of the service discovery service"
+  type        = string
+  default     = "app"
+}
+
+variable "secrets" {
+  description = "Secrets for the container"
+  type        = list(map(string))
+  default     = []
+}
+
+variable "task_execution_role_arn" {
+  description = "ARN of the task execution role (optional, will be created if null)"
+  type        = string
+  default     = null
+}
+
+variable "task_role_arn" {
+  description = "ARN of the task role (optional, will be created if null)"
+  type        = string
+  default     = null
+}
+
+variable "max_capacity" {
+  description = "Maximum capacity for auto-scaling"
+  type        = number
+  default     = 1
+}
+
+variable "min_capacity" {
+  description = "Minimum capacity for auto-scaling"
+  type        = number
+  default     = 1
+}
+
+variable "cpu_target_value" {
+  description = "Target CPU utilization for auto-scaling"
+  type        = number
+  default     = 70
+}
+
+variable "memory_target_value" {
+  description = "Target memory utilization for auto-scaling"
+  type        = number
+  default     = 80
 }
