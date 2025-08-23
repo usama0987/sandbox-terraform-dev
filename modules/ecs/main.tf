@@ -69,8 +69,6 @@ resource "aws_service_discovery_service" "app" {
     routing_policy = "MULTIVALUE"
   }
 
-  health_check_grace_period_seconds = 30
-
   tags = {
     Name = "${var.name_prefix}-service-discovery"
   }
