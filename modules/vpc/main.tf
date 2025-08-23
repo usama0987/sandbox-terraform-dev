@@ -25,6 +25,7 @@ resource "aws_internet_gateway" "main" {
 }
 
 # Elastic IPs for NAT Gateways
+/*
 resource "aws_eip" "nat" {
   count  = var.enable_nat_gateway ? length(var.public_subnet_cidrs) : 0
   domain = "vpc"
@@ -35,6 +36,7 @@ resource "aws_eip" "nat" {
     Name = "${var.name_prefix}-eip-${count.index + 1}"
   }
 }
+*/
 
 # Public Subnets
 resource "aws_subnet" "public" {
