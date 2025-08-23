@@ -41,41 +41,32 @@ resource "aws_ecr_repository" "main" {
   }
 }
 
+# Remove or comment out this resource
 #############################
 # ECR Repository Policy
-# (Use only AWS principals — no Service principals)
 #############################
-resource "aws_ecr_repository_policy" "main" {
-  repository = aws_ecr_repository.main.name
-
-  # Ensure roles exist before applying policy
-  depends_on = [
-    aws_iam_role.ecs_task_execution_role,
-    aws_iam_role.ecs_task_role
-  ]
-
-  # Note: do NOT include ecr:GetAuthorizationToken here.
-  # That is granted via IAM and isn't a repo-scoped permission.
-  policy = jsonencode({
-    Version   = "2012-10-17"
-    Statement = [
-      {
-        Sid       = "AllowRepoAccessToAccountAndRoles"
-        Effect    = "Allow"
-        Principal = { AWS = local.allowed_principals }
-        Action = [
-          "ecr:BatchCheckLayerAvailability",
-          "ecr:GetDownloadUrlForLayer",
-          "ecr:BatchGetImage",
-          "ecr:PutImage",
-          "ecr:InitiateLayerUpload",
-          "ecr:UploadLayerPart",
-          "ecr:CompleteLayerUpload"
-        ]
-      }
-    ]
-  })
-}
+# resource "aws_ecr_repository_policy" "main" {
+#   repository = aws_ecr_repository.main.name
+#   policy     = jsonencode({
+#     Version   = "2012-10-17"
+#     Statement = [
+#       {
+#         Sid       = "AllowRepoAccessToAccountAndRoles"
+#         Effect    = "Allow"
+#         Principal = { AWS = local.allowed_principals }
+#         Action = [
+#           "ecr:BatchCheckLayerAvailability",
+#           "ecr:GetDownloadUrlForLayer",
+#           "ecr:BatchGetImage",
+#           "ecr:PutImage",
+#           "ecr:InitiateLayerUpload",
+#           "ecr:UploadLayerPart",
+#           "ecr:CompleteLayerUpload"
+#         ]
+#       }
+#     ]
+#   })
+# }
 
 #############################
 # ECR Lifecycle Policy
