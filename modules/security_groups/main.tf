@@ -1,4 +1,4 @@
-resource "aws_security_group" "main" {
+resource "aws_security_group" "develop" {
   name        = "${var.name_prefix}-alb-ecs-sg"
   description = "Security group for ECS and ALB in ${coalesce(var.environment, "dev-sandbox")}"
   vpc_id      = var.vpc_id
