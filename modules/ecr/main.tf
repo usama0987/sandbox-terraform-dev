@@ -1,4 +1,27 @@
+#############################
+# Identity / Helpers
+#############################
+data "aws_caller_identity" "current" {}
+
+# Build a non-empty list of valid AWS principals:
+# - account root
+# - the roles created in this module
+# - any extras from var.allowed_principals (list(string), may be empty)
+locals {
+  base_principals = [
+    "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root",
+  ]
+  role_principals = [
+    aws_iam_role.ecs_task_execution_role.arn,
+    aws_iam_role.ecs_task_role.arn,
+  ]
+  extra_principals = var.allowed_principals != null ? var.allowed_principals : []
+  allowed_principals = compact(concat(local.base_principals, local.role_principals, local.extra_principals))
+}
+
+#############################
 # ECR Repository
+#############################
 resource "aws_ecr_repository" "main" {
   name                 = "${var.name_prefix}-repository"
   image_tag_mutability = var.image_tag_mutability
@@ -18,32 +41,29 @@ resource "aws_ecr_repository" "main" {
   }
 }
 
-# ECR Repository Policy for ECS access
+#############################
+# ECR Repository Policy
+# (Use only AWS principals — no Service principals)
+#############################
 resource "aws_ecr_repository_policy" "main" {
   repository = aws_ecr_repository.main.name
 
+  # Ensure roles exist before applying policy
+  depends_on = [
+    aws_iam_role.ecs_task_execution_role,
+    aws_iam_role.ecs_task_role
+  ]
+
+  # Note: do NOT include ecr:GetAuthorizationToken here.
+  # That is granted via IAM and isn't a repo-scoped permission.
   policy = jsonencode({
-    Version = "2012-10-17"
+    Version   = "2012-10-17"
     Statement = [
       {
-        Sid    = "AllowECSPull"
-        Effect = "Allow"
-        Principal = {
-          Service = "ecs-tasks.amazonaws.com"
-        }
+        Sid       = "AllowRepoAccessToAccountAndRoles"
+        Effect    = "Allow"
+        Principal = { AWS = local.allowed_principals }
         Action = [
-          "ecr:GetAuthorizationToken",
-          "ecr:BatchCheckLayerAvailability",
-          "ecr:GetDownloadUrlForLayer",
-          "ecr:BatchGetImage"
-        ]
-      },
-      {
-        Sid    = "AllowSpecificPrincipals"
-        Effect = "Allow"
-        Principal = var.allowed_principals != null ? { AWS = var.allowed_principals } : {}
-        Action = [
-          "ecr:GetAuthorizationToken",
           "ecr:BatchCheckLayerAvailability",
           "ecr:GetDownloadUrlForLayer",
           "ecr:BatchGetImage",
@@ -57,7 +77,9 @@ resource "aws_ecr_repository_policy" "main" {
   })
 }
 
-# ECR Lifecycle Policy to manage image retention
+#############################
+# ECR Lifecycle Policy
+#############################
 resource "aws_ecr_lifecycle_policy" "main" {
   repository = aws_ecr_repository.main.name
 
@@ -72,9 +94,7 @@ resource "aws_ecr_lifecycle_policy" "main" {
           countType     = "imageCountMoreThan"
           countNumber   = var.max_image_count
         }
-        action = {
-          type = "expire"
-        }
+        action = { type = "expire" }
       },
       {
         rulePriority = 2
@@ -85,29 +105,26 @@ resource "aws_ecr_lifecycle_policy" "main" {
           countUnit   = "days"
           countNumber = var.untagged_image_days
         }
-        action = {
-          type = "expire"
-        }
+        action = { type = "expire" }
       }
     ]
   })
 }
 
-# IAM Role for ECS Task Execution
+#############################
+# IAM Roles
+#############################
+# Task Execution Role
 resource "aws_iam_role" "ecs_task_execution_role" {
   name = "${var.name_prefix}-ecs-task-execution-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRole"
-        Effect = "Allow"
-        Principal = {
-          Service = "ecs-tasks.amazonaws.com"
-        }
-      }
-    ]
+    Statement = [{
+      Action    = "sts:AssumeRole"
+      Effect    = "Allow"
+      Principal = { Service = "ecs-tasks.amazonaws.com" }
+    }]
   })
 
   tags = {
@@ -115,33 +132,28 @@ resource "aws_iam_role" "ecs_task_execution_role" {
   }
 }
 
-# Attach AWS managed policy for ECS task execution
+# Attach AWS managed policies
 resource "aws_iam_role_policy_attachment" "ecs_task_execution_role_policy" {
   role       = aws_iam_role.ecs_task_execution_role.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
-# Additional policy for ECR access
 resource "aws_iam_role_policy_attachment" "ecs_task_execution_ecr_policy" {
   role       = aws_iam_role.ecs_task_execution_role.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
 }
 
-# IAM Role for ECS Task (application runtime)
+# Task Role (application runtime)
 resource "aws_iam_role" "ecs_task_role" {
   name = "${var.name_prefix}-ecs-task-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRole"
-        Effect = "Allow"
-        Principal = {
-          Service = "ecs-tasks.amazonaws.com"
-        }
-      }
-    ]
+    Statement = [{
+      Action    = "sts:AssumeRole"
+      Effect    = "Allow"
+      Principal = { Service = "ecs-tasks.amazonaws.com" }
+    }]
   })
 
   tags = {
