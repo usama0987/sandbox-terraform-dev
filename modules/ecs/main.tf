@@ -1,4 +1,3 @@
-
 # Data source for current caller identity
 data "aws_caller_identity" "current" {}
 
@@ -215,7 +214,7 @@ resource "aws_ecs_service" "app" {
 
   # Multi-AZ deployment configuration
   network_configuration {
-    subnets          = var.private_subnet_ids  # This ensures multi-AZ deployment across all private subnets
+    subnets         = var.private_subnet_ids # This ensures multi-AZ deployment across all private subnets
     security_groups  = var.security_group_ids
     assign_public_ip = false
   }
@@ -278,8 +277,8 @@ resource "aws_appautoscaling_policy" "ecs_cpu_policy" {
       predefined_metric_type = "ECSServiceAverageCPUUtilization"
     }
     target_value       = var.cpu_target_value
-    scale_out_cooldown = 300  # 5 minutes
-    scale_in_cooldown  = 300  # 5 minutes
+    scale_out_cooldown = 300 # 5 minutes
+    scale_in_cooldown  = 300 # 5 minutes
   }
 
   tags = {
@@ -300,8 +299,8 @@ resource "aws_appautoscaling_policy" "ecs_memory_policy" {
       predefined_metric_type = "ECSServiceAverageMemoryUtilization"
     }
     target_value       = var.memory_target_value
-    scale_out_cooldown = 300  # 5 minutes
-    scale_in_cooldown  = 300  # 5 minutes
+    scale_out_cooldown = 300 # 5 minutes
+    scale_in_cooldown  = 300 # 5 minutes
   }
 
   tags = {
