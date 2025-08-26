@@ -30,7 +30,7 @@ locals {
   environment = "dev-sandbox"
   region      = "us-east-1"
 
-  # VPC Configuration
+  # VPC Configuration - Multi-AZ setup
   vpc_cidr             = "10.0.0.0/16"
   public_subnet_cidrs  = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
   private_subnet_cidrs = ["10.0.11.0/24", "10.0.12.0/24", "10.0.13.0/24"]
@@ -41,13 +41,19 @@ locals {
   max_image_count      = 10
   untagged_image_days  = 7
 
-  # ECS Configuration
+  # ECS Configuration with Auto Scaling
   task_cpu           = "512"
   task_memory        = "1024"
-  desired_count      = 1 # Set to 1 for minimum and maximum 1 container
+  desired_count      = 1
+  min_capacity       = 1
+  max_capacity       = 2
   log_retention_days = 7
   container_name     = "app"
   container_port     = 5000
+  
+  # Auto Scaling Configuration
+  cpu_target_value    = 70
+  memory_target_value = 80
 
   # Application Configuration
   container_image = "${module.ecr.repository_url}:latest"
@@ -116,7 +122,7 @@ module "alb" {
   enable_deletion_protection = false
 }
 
-# ECS Module
+# ECS Module with Multi-AZ Auto Scaling
 module "ecs" {
   source = "../../modules/ecs"
 
@@ -129,6 +135,10 @@ module "ecs" {
   task_cpu                           = local.task_cpu
   task_memory                        = local.task_memory
   desired_count                      = local.desired_count
+  min_capacity                       = local.min_capacity
+  max_capacity                       = local.max_capacity
+  cpu_target_value                   = local.cpu_target_value
+  memory_target_value                = local.memory_target_value
   log_retention_days                 = local.log_retention_days
   environment_variables              = local.environment_variables
   enable_container_insights          = true
