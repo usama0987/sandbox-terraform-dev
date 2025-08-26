@@ -1,4 +1,3 @@
-
 # AWS Provider Configuration
 terraform {
   required_version = ">= 1.0"
@@ -50,7 +49,7 @@ locals {
   log_retention_days = 7
   container_name     = "app"
   container_port     = 5000
-  
+
   # Auto Scaling Configuration
   cpu_target_value    = 70
   memory_target_value = 80
