@@ -280,10 +280,6 @@ resource "aws_appautoscaling_policy" "ecs_cpu_policy" {
     scale_out_cooldown = 300 # 5 minutes
     scale_in_cooldown  = 300 # 5 minutes
   }
-
-  tags = {
-    Name = "${var.name_prefix}-cpu-scaling-policy"
-  }
 }
 
 # Application Auto Scaling Policy - Memory
@@ -301,9 +297,5 @@ resource "aws_appautoscaling_policy" "ecs_memory_policy" {
     target_value       = var.memory_target_value
     scale_out_cooldown = 300 # 5 minutes
     scale_in_cooldown  = 300 # 5 minutes
-  }
-
-  tags = {
-    Name = "${var.name_prefix}-memory-scaling-policy"
   }
 }
