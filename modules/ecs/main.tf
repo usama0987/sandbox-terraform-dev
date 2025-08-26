@@ -1,5 +1,9 @@
+
 # Data source for current caller identity
 data "aws_caller_identity" "current" {}
+
+# Data source for current region
+data "aws_region" "current" {}
 
 # Data source for availability zones
 data "aws_availability_zones" "available" {
@@ -180,7 +184,7 @@ resource "aws_ecs_task_definition" "app" {
         logDriver = "awslogs"
         options = {
           "awslogs-group"         = aws_cloudwatch_log_group.ecs_logs.name
-          "awslogs-region"        = data.aws_availability_zones.available.id
+          "awslogs-region"        = data.aws_region.current.name
           "awslogs-stream-prefix" = "ecs"
         }
       }
@@ -200,7 +204,7 @@ resource "aws_ecs_task_definition" "app" {
   }
 }
 
-# ECS Service
+# ECS Service with Multi-AZ deployment
 resource "aws_ecs_service" "app" {
   name             = "${var.name_prefix}-service"
   cluster          = aws_ecs_cluster.main.id
@@ -209,8 +213,9 @@ resource "aws_ecs_service" "app" {
   launch_type      = "FARGATE"
   platform_version = var.platform_version
 
+  # Multi-AZ deployment configuration
   network_configuration {
-    subnets          = var.private_subnet_ids
+    subnets          = var.private_subnet_ids  # This ensures multi-AZ deployment across all private subnets
     security_groups  = var.security_group_ids
     assign_public_ip = false
   }
@@ -235,6 +240,9 @@ resource "aws_ecs_service" "app" {
 
   enable_execute_command = var.enable_execute_command
 
+  # Force new deployment when task definition changes
+  force_new_deployment = true
+
   depends_on = [
     aws_iam_role_policy_attachment.task_execution_role_policy
   ]
@@ -251,6 +259,10 @@ resource "aws_appautoscaling_target" "ecs_target" {
   resource_id        = "service/${aws_ecs_cluster.main.name}/${aws_ecs_service.app.name}"
   scalable_dimension = "ecs:service:DesiredCount"
   service_namespace  = "ecs"
+
+  tags = {
+    Name = "${var.name_prefix}-autoscaling-target"
+  }
 }
 
 # Application Auto Scaling Policy - CPU
@@ -265,7 +277,13 @@ resource "aws_appautoscaling_policy" "ecs_cpu_policy" {
     predefined_metric_specification {
       predefined_metric_type = "ECSServiceAverageCPUUtilization"
     }
-    target_value = var.cpu_target_value
+    target_value       = var.cpu_target_value
+    scale_out_cooldown = 300  # 5 minutes
+    scale_in_cooldown  = 300  # 5 minutes
+  }
+
+  tags = {
+    Name = "${var.name_prefix}-cpu-scaling-policy"
   }
 }
 
@@ -281,6 +299,12 @@ resource "aws_appautoscaling_policy" "ecs_memory_policy" {
     predefined_metric_specification {
       predefined_metric_type = "ECSServiceAverageMemoryUtilization"
     }
-    target_value = var.memory_target_value
+    target_value       = var.memory_target_value
+    scale_out_cooldown = 300  # 5 minutes
+    scale_in_cooldown  = 300  # 5 minutes
+  }
+
+  tags = {
+    Name = "${var.name_prefix}-memory-scaling-policy"
   }
 }
