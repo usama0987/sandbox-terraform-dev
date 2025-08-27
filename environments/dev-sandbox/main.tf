@@ -155,4 +155,8 @@ module "ecs" {
   enable_deployment_circuit_breaker  = true
   enable_deployment_rollback         = true
   enable_execute_command             = false
+  
+  # Use IAM roles from ECR module to avoid conflicts
+  task_execution_role_arn             = module.ecr.ecs_task_execution_role_arn
+  task_role_arn                      = module.ecr.ecs_task_role_arn
 }
